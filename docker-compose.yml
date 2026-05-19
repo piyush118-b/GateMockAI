@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: gate_postgres
+    environment:
+      POSTGRES_DB: gate_db
+      POSTGRES_USER: gate_user
+      POSTGRES_PASSWORD: gate_pass
+    ports:
+      - "5439:5432"
+    volumes:
+      - gate_pgdata:/var/lib/postgresql/data
+
+volumes:
+  gate_pgdata:

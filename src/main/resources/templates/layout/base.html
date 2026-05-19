@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/springsecurity6"
+      th:fragment="layout(content)">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${pageTitle != null ? pageTitle + ' | GATE MockAI' : 'GATE MockAI'}">GATE MockAI</title>
+  <link rel="stylesheet" th:href="@{/css/main.css}">
+</head>
+<body>
+  <nav class="navbar">
+    <a class="brand" th:href="@{/home}">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 4px;">
+        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#brandGrad)" />
+        <path d="M2 17L12 22L22 17" stroke="url(#brandGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M2 12L12 17L22 12" stroke="url(#brandGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <defs>
+          <linearGradient id="brandGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
+            <stop stop-color="#4f46e5" />
+            <stop offset="1" stop-color="#06b6d4" />
+          </linearGradient>
+        </defs>
+      </svg>
+      GATE MockAI
+    </a>
+    <div class="nav-links">
+      <span sec:authorize="isAuthenticated()" th:text="${#authentication.principal.username}"></span>
+      <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/dashboard}">Admin Panel</a>
+      <a sec:authorize="hasRole('STUDENT')" th:href="@{/student/tests}">Tests</a>
+      <a sec:authorize="hasRole('STUDENT')" th:href="@{/dashboard}">Dashboard</a>
+      <a sec:authorize="isAuthenticated()" th:href="@{/logout}" class="logout">Logout</a>
+    </div>
+  </nav>
+  <main class="container" th:replace="${content}"></main>
+  <script th:src="@{/js/main.js}"></script>
+</body>
+</html>

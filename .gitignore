@@ -1,0 +1,7 @@
+target/
+.idea/
+*.class
+.DS_Store
+./data/vector-store.json
+/data/vector-store.json
+data/vector-store.json

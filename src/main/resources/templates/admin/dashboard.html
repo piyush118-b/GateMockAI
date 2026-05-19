@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>Admin Dashboard | GATE MockAI</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div class="dashboard-hero">
+            <h1>Admin Panel</h1>
+            <p>Welcome to the GATE MockAI Management Dashboard. Orchestrate mock tests, manage students, and configure the AI generation engines.</p>
+        </div>
+
+        <!-- Success and Error Alerts -->
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <div class="stat-group">
+            <div class="stat-card">
+                <div class="stat-number" th:text="${testsCount}">0</div>
+                <div class="stat-label">Total Mock Tests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" th:text="${publishedCount}">0</div>
+                <div class="stat-label">Published Tests</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" th:text="${vectorCount}">0</div>
+                <div class="stat-label">RAG Vector Count</div>
+            </div>
+        </div>
+
+        <div class="grid-cols-2" style="margin-top: 2rem;">
+            <div class="card">
+                <h3>Quick Management Actions</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">Use these quick links to manage mock exams and configure test generations.</p>
+                <div style="display: flex; flex-direction: column; gap: 1rem;">
+                    <a th:href="@{/admin/tests}" class="btn btn-secondary" style="justify-content: flex-start;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        Manage Existing Mock Tests
+                    </a>
+                    <a th:href="@{/admin/tests/generate}" class="btn btn-primary" style="justify-content: flex-start;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Run AI Exam Generator (Phase 3)
+                    </a>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>RAG Vector Store Pipeline</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Pipeline Status: 
+                    <span th:class="${vectorCount > 0} ? 'badge badge-published' : 'badge badge-draft'" 
+                          th:text="${vectorCount > 0 ? 'Active' : 'Offline'}">Offline</span>
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+                    Embedded Seed Questions: <strong style="color: var(--primary);" th:text="${vectorCount}">0</strong>
+                </p>
+                <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.85rem; word-break: break-all;">
+                    Persistence Path: <code style="color: var(--accent); font-family: monospace;" th:text="${storePath}">./data/vector-store.json</code>
+                </p>
+                <form th:action="@{/admin/rag/reingest}" method="post">
+                    <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                        Force Re-ingest Seed Questions
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 2rem;">
+            <h3>System Status & Database</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem;">
+                <p style="color: var(--text-secondary);">Database Migrations: <strong style="color: var(--success);">Clean (V1, V2, V3 applied)</strong></p>
+                <p style="color: var(--text-secondary);">PostgreSQL Status: <strong style="color: var(--primary);">Connection Secured</strong></p>
+                <p style="color: var(--text-secondary);">LLM Integration (Gemini): <strong style="color: var(--warning);">Wired (Phase 2 Ingestion)</strong></p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

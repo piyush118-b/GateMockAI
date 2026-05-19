@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>Available Mock Exams | GATE MockAI</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div style="margin-bottom: 2rem;">
+            <h2>Available GATE Mock Exams</h2>
+            <p style="color: var(--text-secondary);">Select a syllabus-aligned test below to launch your secure exam session.</p>
+        </div>
+
+        <div th:if="${#lists.isEmpty(tests)}" class="card" style="text-align: center; padding: 4rem 2rem;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" style="margin-bottom: 1rem;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <h3>No Tests Published Yet</h3>
+            <p style="color: var(--text-secondary); max-width: 420px; margin: 0.5rem auto 0 auto;">Our administrators are currently generating syllabus-aligned mock tests using the AI generator. Please check back shortly!</p>
+        </div>
+
+        <div th:if="${!#lists.isEmpty(tests)}" class="grid-cols-3">
+            <div th:each="test : ${tests}" class="card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                        <span class="badge badge-msq" th:text="${test.subject}">CS</span>
+                        <span class="badge badge-published" th:text="${test.durationMinutes} + ' Mins'">180 Mins</span>
+                    </div>
+                    <h3 th:text="${test.title}" style="font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">GATE Computer Science Full Mock</h3>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem;">
+                        Topic coverage: <span th:text="${test.topic}" style="font-weight: 500;">All Subjects</span>
+                    </p>
+                    <div style="display: flex; gap: 1.5rem; margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+                        <div>
+                            <strong>Questions:</strong> <span th:text="${test.totalQuestions}" style="color: var(--text-primary);">65</span>
+                        </div>
+                        <div>
+                            <strong>Marks:</strong> <span th:text="${test.totalMarks}" style="color: var(--text-primary);">100</span>
+                        </div>
+                    </div>
+                </div>
+                <a href="#" class="btn btn-primary btn-block" onclick="alert('Exam launch logic is wired in Phase 2!')">
+                    Launch Test
+                </a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

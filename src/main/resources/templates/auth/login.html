@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>Login | GATE MockAI</title>
+</head>
+<body>
+    <div th:fragment="content" class="auth-wrapper">
+        <div class="card">
+            <h2 class="auth-title">Welcome Back</h2>
+            <p class="auth-subtitle">Sign in to your GATE MockAI account</p>
+
+            <!-- Feedback banners -->
+            <div th:if="${param.error}" class="alert alert-danger">
+                Invalid email or password. Please try again.
+            </div>
+            <div th:if="${param.logout}" class="alert alert-success">
+                You have been successfully logged out.
+            </div>
+            <div th:if="${param.registered}" class="alert alert-success">
+                Registration successful! Please login with your new account.
+            </div>
+
+            <form th:action="@{/login}" method="post">
+                <div class="form-group">
+                    <label for="username" class="form-label">Email Address</label>
+                    <input type="email" id="username" name="username" class="form-control" placeholder="name@domain.com" required autofocus>
+                </div>
+                <div class="form-group">
+                    <label for="password" class="form-label">Password</label>
+                    <input type="password" id="password" name="password" class="form-control" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary btn-block">Sign In</button>
+            </form>
+
+            <div class="auth-footer">
+                Don't have an account? <a th:href="@{/register}">Register here</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

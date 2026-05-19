@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>AI Exam Generator | GATE MockAI</title>
+</head>
+<body>
+    <div th:fragment="content">
+        <div style="margin-bottom: 2rem;">
+            <h2>AI-Powered GATE Exam Generator</h2>
+            <p style="color: var(--text-secondary);">Leverage Google Gemini Pro to dynamically draft complete, syllabus-aligned GATE Mock Tests.</p>
+        </div>
+
+        <div class="card" style="max-width: 650px; margin: 0 auto;">
+            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                <h3 style="font-size: 1.35rem;">Configure Generator Settings</h3>
+            </div>
+            
+            <form onsubmit="event.preventDefault(); alert('AI Exam Generation is a Phase 3 feature. Database, security, and Thymeleaf scaffolds are now fully operational!');">
+                <div class="form-group">
+                    <label class="form-label" for="subject">GATE Subject</label>
+                    <select class="form-control" id="subject">
+                        <option value="CS">Computer Science & Information Technology (CS)</option>
+                        <option value="EC">Electronics & Communication (EC)</option>
+                        <option value="EE">Electrical Engineering (EE)</option>
+                        <option value="ME">Mechanical Engineering (ME)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="topic">Topic Coverage</label>
+                    <input type="text" class="form-control" id="topic" placeholder="e.g. Memory Management, CPU Scheduling, Virtual Memory" required>
+                </div>
+
+                <div class="grid-cols-2" style="gap: 1rem; margin-bottom: 1.5rem;">
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="questionCount">Total Questions</label>
+                        <input type="number" class="form-control" id="questionCount" value="10" min="5" max="65" required>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 0;">
+                        <label class="form-label" for="duration">Duration (Minutes)</label>
+                        <input type="number" class="form-control" id="duration" value="30" min="15" max="180" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="difficulty">Cognitive Target (GATE levels)</label>
+                    <select class="form-control" id="difficulty">
+                        <option value="balanced">Balanced (1-mark easy, 2-mark high-order analytical)</option>
+                        <option value="analytical">Highly Analytical (Focus on MSQ & NAT)</option>
+                        <option value="recall">Recall & Application</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">
+                    Generate Syllabus-Aligned Test
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>
