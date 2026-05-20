@@ -113,6 +113,8 @@ public class AdminRagController {
                       "marks": 1,
                       "negativeMarks": 0.33,
                       "explanation": "Official Answer derived from key.",
+                      "subject": "Auto-classified subject based on academic context (e.g., Operating Systems, Databases, Algorithms)",
+                      "topic": "Auto-classified topic based on academic context (e.g., CPU Scheduling, SQL Queries, Asymptotic Notation)",
                       "options": [
                         {"label": "A", "text": "...", "isCorrect": true},
                         {"label": "B", "text": "...", "isCorrect": false},
@@ -128,7 +130,8 @@ public class AdminRagController {
                 - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
                 - MSQ: multiple options marked correct based on Answer Key source context.
                 - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
-                """, 
+                - You MUST auto-classify the academic subject (e.g., 'Operating Systems', 'Databases', 'Algorithms') and topic (e.g., 'CPU Scheduling', 'SQL Queries', 'Asymptotic Notation') for every single question and put it in the "subject" and "topic" fields of each question in the array.
+                """,  
                 extractedText.substring(0, Math.min(extractedText.length(), 4000)), // Safe window size for local LLM
                 extractedAnswerKeyText.isEmpty() ? "No Answer Key PDF uploaded." : extractedAnswerKeyText.substring(0, Math.min(extractedAnswerKeyText.length(), 3000)),
                 keysJson.equals("{}") ? "No manual list provided." : keysJson,
@@ -192,16 +195,20 @@ public class AdminRagController {
             // Step 2: Convert to Spring AI documents and embed inside PGVector
             List<Document> documents = new ArrayList<>();
             for (AiGeneratedQuestionDto q : draft.getQuestions()) {
+                String dynamicSubject = q.getSubject() != null && !q.getSubject().trim().isEmpty() ? q.getSubject() : draft.getSubject();
+                String dynamicTopic = q.getTopic() != null && !q.getTopic().trim().isEmpty() ? q.getTopic() : draft.getTopic();
+
                 String content = String.format(
                     "Subject: %s | Topic: %s | Type: %s\nQuestion: %s\nExplanation: %s",
-                    draft.getSubject(), draft.getTopic(), q.getType(),
+                    dynamicSubject, dynamicTopic, q.getType(),
                     q.getQuestionText(),
                     q.getExplanation() != null ? q.getExplanation() : ""
                 );
-                Map<String, Object> metadata = Map.of(
+
+                java.util.Map<String, Object> metadata = java.util.Map.of(
                     "id", "parsed_" + q.getSequenceNo() + "_" + System.currentTimeMillis(),
-                    "topic", draft.getTopic(),
-                    "subject", draft.getSubject(),
+                    "topic", dynamicTopic,
+                    "subject", dynamicSubject,
                     "type", q.getType()
                 );
                 documents.add(new Document(content, metadata));

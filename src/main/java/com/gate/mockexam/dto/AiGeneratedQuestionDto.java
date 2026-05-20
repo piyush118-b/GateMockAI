@@ -13,5 +13,7 @@ public class AiGeneratedQuestionDto {
     private Double correctNatValue;
     private Double natTolerance;
     private String explanation;
+    private String subject;         // Auto-classified by local LLM, e.g. "Operating Systems"
+    private String topic;           // Auto-classified by local LLM, e.g. "CPU Scheduling"
     private List<AiGeneratedOptionDto> options;
 }
