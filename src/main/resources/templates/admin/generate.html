@@ -3,7 +3,6 @@
       th:replace="~{layout/base :: layout(~{::content})}">
 <head>
     <title>AI Exam Generator | GATE MockAI</title>
-    <!-- Add special styling for loading state and cards in this template -->
     <style th:inline="css">
         .loading-overlay {
             position: fixed;
@@ -11,9 +10,9 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(11, 15, 25, 0.85);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
+            background-color: rgba(11, 15, 25, 0.9);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
             z-index: 9999;
             display: flex;
             flex-direction: column;
@@ -64,15 +63,103 @@
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1.5rem;
         }
+
+        /* Full Paper Simulator Styles */
+        .simulator-card {
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+            border: 1px solid rgba(99, 102, 241, 0.2);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 3rem;
+            box-shadow: var(--shadow-lg);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .simulator-glow {
+            position: absolute;
+            top: -20%;
+            right: -10%;
+            width: 300px;
+            height: 300px;
+            background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, rgba(0,0,0,0) 70%);
+            pointer-events: none;
+        }
+
+        /* Progress Bar */
+        .progress-wrapper {
+            width: 100%;
+            max-width: 500px;
+            background-color: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 12px;
+            border-radius: 6px;
+            margin: 1.5rem 0;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--primary) 0%, var(--accent) 100%);
+            border-radius: 6px;
+            transition: width 0.4s ease;
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        }
+
+        .blueprint-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        .blueprint-item {
+            background-color: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .blueprint-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .blueprint-label {
+            font-size: 0.75rem;
+            color: #cbd5e1;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-top: 0.25rem;
+        }
     </style>
 </head>
 <body>
-    <div th:fragment="content">
-        <!-- RAG Generation Loading Screen Overlay -->
+    <div th:fragment="content" style="max-width: 900px; margin: 0 auto;">
+        
+        <!-- Standard Loading Overlay -->
         <div id="aiLoadingOverlay" class="loading-overlay">
             <div class="ai-spinner"></div>
             <div class="ai-loading-text">Gemini AI Generating Questions...</div>
             <div class="ai-loading-subtext" id="aiLoadingMessage">Running similarity search on local RAG seeds, generating technical MCQ/MSQ/NAT papers, and rendering conceptual explanations. Please wait ~15 seconds.</div>
+        </div>
+
+        <!-- FULL EXAM SEGMENTED LOADER OVERLAY -->
+        <div id="fullExamLoadingOverlay" class="loading-overlay">
+            <div class="ai-spinner"></div>
+            <div class="ai-loading-text" id="fullExamStatusTitle">Compiling Full GATE CSE Exam...</div>
+            <div style="font-size: 0.9rem; color: #cbd5e1;" id="fullExamPercentText">Progress: 0%</div>
+            
+            <div class="progress-wrapper">
+                <div id="fullExamProgressBar" class="progress-bar-fill"></div>
+            </div>
+            
+            <div class="ai-loading-subtext" id="fullExamProgressMessage" style="font-family: monospace; max-width: 600px; text-align: left; background-color: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); height: 100px; overflow-y: auto;">
+                [System] Initializing RAG compiler...
+            </div>
         </div>
 
         <div style="margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem;">
@@ -91,10 +178,49 @@
         <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
         <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-        <div class="card" style="max-width: 750px; margin: 0 auto;">
+        <!-- DEDICATED ONE-CLICK FULL PAPER SIMULATOR -->
+        <div class="simulator-card">
+            <div class="simulator-glow"></div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem;">
+                <div>
+                    <span class="badge badge-published" style="background-color: var(--accent); color: white; margin-bottom: 0.5rem;">IIT-Caliber Blueprint</span>
+                    <h2 style="font-size: 1.75rem; font-weight: 800; color: #ffffff; margin-bottom: 0.25rem;">Full-Length 100-Mark CSE Exam Simulator</h2>
+                    <p style="color: #cbd5e1; font-size: 0.95rem;">Compiles a standard GATE Computer Science examination consisting of exactly 65 questions spanning GA, Math, and Core CS subjects.</p>
+                </div>
+            </div>
+
+            <!-- Blueprint specs grid -->
+            <div class="blueprint-grid">
+                <div class="blueprint-item">
+                    <div class="blueprint-val">65</div>
+                    <div class="blueprint-label">Questions</div>
+                </div>
+                <div class="blueprint-item">
+                    <div class="blueprint-val">100</div>
+                    <div class="blueprint-label">Marks</div>
+                </div>
+                <div class="blueprint-item">
+                    <div class="blueprint-val">180 Mins</div>
+                    <div class="blueprint-label">Time Limit</div>
+                </div>
+                <div class="blueprint-item">
+                    <div class="blueprint-val">6 Sections</div>
+                    <div class="blueprint-label">Segmented RAG</div>
+                </div>
+            </div>
+
+            <button type="button" class="btn btn-block" style="background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: white; font-weight: 700; font-size: 1.1rem; padding: 1.2rem; border-radius: 12px; border: none; cursor: pointer; box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4); margin-top: 2rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem;" onclick="triggerFullExamGeneration()">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                Assemble Full 65-Question GATE CSE Exam
+            </button>
+        </div>
+
+        <!-- SECONDARY SECTION: CUSTOM TOPIC GENERATION FORM -->
+        <div class="card" style="max-width: 100%;">
             <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 2rem;">
-                <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--text-primary);">Configure Exam Template</h2>
-                <p style="color: var(--text-secondary); font-size: 0.9rem;">Set target topic parameters to seed the semantic context engine.</p>
+                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">AI Custom Topic Generation</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">Generate an ad-hoc custom review quiz for specific learning topics.</p>
             </div>
 
             <form th:action="@{/admin/tests/generate}" th:object="${request}" method="post" id="generatorForm">
@@ -137,13 +263,71 @@
                 <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
                     <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem; font-size: 1rem;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        Generate Mock Test with Gemini AI
+                        Generate Custom Quiz with Gemini AI
                     </button>
                 </div>
             </form>
         </div>
 
         <script>
+            // SSE Full Exam Generation Engine
+            function triggerFullExamGeneration() {
+                const overlay = document.getElementById('fullExamLoadingOverlay');
+                const progressBar = document.getElementById('fullExamProgressBar');
+                const percentText = document.getElementById('fullExamPercentText');
+                const progressMessage = document.getElementById('fullExamProgressMessage');
+                const statusTitle = document.getElementById('fullExamStatusTitle');
+
+                overlay.classList.add('active');
+                progressMessage.innerHTML = "[System] Initializing RAG compiler threads...<br>";
+
+                // Initialize Server-Sent Events stream
+                const eventSource = new EventSource('/admin/tests/generate/progress');
+
+                eventSource.addEventListener('progress', function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        progressBar.style.width = data.percent + '%';
+                        percentText.textContent = 'Progress: ' + data.percent + '%';
+                        progressMessage.innerHTML += `[RAG Compiler] Segment ${data.step}: ${data.message}<br>`;
+                        progressMessage.scrollTop = progressMessage.scrollHeight;
+                    } catch (err) {
+                        console.error("Failed to parse progress event data", err);
+                    }
+                });
+
+                eventSource.addEventListener('complete', function(e) {
+                    eventSource.close();
+                    progressMessage.innerHTML += `[System] Compilation finished! Redirecting to dashboard details...<br>`;
+                    progressBar.style.width = '100%';
+                    percentText.textContent = 'Progress: 100%';
+                    
+                    setTimeout(() => {
+                        window.location.href = e.data;
+                    }, 1000);
+                });
+
+                eventSource.addEventListener('error', function(e) {
+                    eventSource.close();
+                    statusTitle.textContent = "Compilation Failed!";
+                    statusTitle.style.color = "var(--danger)";
+                    progressMessage.innerHTML += `<span style="color: var(--danger);">[Error] Generative compile failed: ${e.data || 'Connection closed/timed out.'}</span><br>`;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary';
+                    btn.textContent = 'Close and Retry';
+                    btn.style.marginTop = '1rem';
+                    btn.onclick = () => {
+                        overlay.classList.remove('active');
+                        btn.remove();
+                        statusTitle.textContent = "Compiling Full GATE CSE Exam...";
+                        statusTitle.style.color = "#ffffff";
+                    };
+                    overlay.appendChild(btn);
+                });
+            }
+
+            // Custom Topic Form Overlay
             document.addEventListener('DOMContentLoaded', function() {
                 const form = document.getElementById('generatorForm');
                 const overlay = document.getElementById('aiLoadingOverlay');
@@ -163,17 +347,12 @@
                 form.addEventListener('submit', function(e) {
                     if (isSubmitting) return;
 
-                    // Check fields validity before triggering overlay
                     const subjectVal = document.getElementById('subject').value;
                     const topicVal = document.getElementById('topic').value.trim();
-                    if (!subjectVal || !topicVal) {
-                        return; // Let standard Spring validation highlight empty inputs
-                    }
+                    if (!subjectVal || !topicVal) return;
 
                     e.preventDefault();
                     isSubmitting = true;
-
-                    // Show overlay immediately
                     overlay.classList.add('active');
                     
                     let step = 0;
@@ -182,12 +361,11 @@
                             msg.textContent = messages[step];
                             step++;
                         } else {
-                            msg.textContent = "Finalizing data commitment to tables... Almost done!";
+                            msg.textContent = "Finalizing data commitment... Almost done!";
                             clearInterval(interval);
                         }
                     }, 2200);
 
-                    // Wait 150ms to guarantee browser repaints the DOM showing the loader
                     setTimeout(() => {
                         form.submit();
                     }, 150);

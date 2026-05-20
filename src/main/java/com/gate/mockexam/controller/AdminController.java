@@ -13,6 +13,10 @@ import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.List;
 import java.util.Map;
@@ -20,6 +24,7 @@ import java.util.UUID;
 
 @Controller
 @RequestMapping("/admin")
+@Slf4j
 public class AdminController {
 
     private final MockTestService mockTestService;
@@ -141,5 +146,44 @@ public class AdminController {
             redirectAttributes.addFlashAttribute("error", "Ingestion failed: " + e.getMessage());
         }
         return "redirect:/admin/dashboard";
+    }
+
+    // GET /admin/tests/generate/progress — Asynchronous full 65-question RAG paper compiler streaming
+    @GetMapping("/tests/generate/progress")
+    public SseEmitter streamFullPaperGeneration() {
+        SseEmitter emitter = new SseEmitter(600_000L); // 10 minutes timeout
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                MockTest test = generationService.generateFullGateCsePaper(progressJson -> {
+                    try {
+                        emitter.send(SseEmitter.event()
+                            .name("progress")
+                            .data(progressJson));
+                    } catch (IOException e) {
+                        log.error("Failed to send SSE progress", e);
+                    }
+                });
+
+                // Send final completion message with redirect url
+                emitter.send(SseEmitter.event()
+                    .name("complete")
+                    .data("/admin/tests/" + test.getId()));
+                emitter.complete();
+
+            } catch (Exception e) {
+                log.error("AI Paper compilation failed asynchronously", e);
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(e.getMessage() != null ? e.getMessage() : "Unknown compilation error"));
+                } catch (IOException ioException) {
+                    log.error("Failed to send SSE error notification", ioException);
+                }
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
     }
 }

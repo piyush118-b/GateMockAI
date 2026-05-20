@@ -41,10 +41,14 @@ public class MockTestGenerationService {
     @Value("classpath:prompts/generate_mock_test.st")
     private Resource promptTemplate;
 
+    @Value("classpath:prompts/generate_full_gate_segment.st")
+    private Resource segmentPromptTemplate;
+
     @jakarta.annotation.PostConstruct
     public void init() {
         objectMapper.configure(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS.mappedFeature(), true);
     }
+
 
     public MockTest generateAndSaveTest(MockTestGenerationRequestDto request) {
         // Enforce limits to control Gemini API costs
@@ -158,11 +162,146 @@ public class MockTestGenerationService {
         return test;
     }
 
+    @Transactional
+    public MockTest generateFullGateCsePaper(java.util.function.Consumer<String> progressCallback) {
+        log.info("Starting Full 65-Question GATE CSE AI Paper compilation...");
+        
+        // Step 1: Create new MockTest parent
+        MockTest test = MockTest.builder()
+            .title("AI-Generated Full 100-Mark GATE CSE Exam")
+            .topic("Full Syllabus")
+            .subject("Computer Science")
+            .durationMinutes(180)
+            .isPublished(false)
+            .build();
+        test = mockTestRepository.save(test);
+
+        // Define segment definitions matching the syllabus blueprint
+        String[][] segments = {
+            {"General Aptitude", "General Aptitude", "Verbal Ability, Reading Comprehension, Sentence Correction, Quantitative Aptitude, Ratios, Percentages, Probability, Logical Reasoning", "1", "6", "2", "2"},
+            {"Engineering Mathematics", "Discrete Mathematics, Linear Algebra, Probability, Calculus", "Logic, Sets, Relations, Functions, Recurrence, Graph Theory, Combinatorics, Matrices, Eigenvalues, Bayes Theorem, Limits, Differentiation", "11", "5", "2", "3"},
+            {"Data Structures & Algorithms", "Programming, Data Structures, Algorithms", "Arrays, Linked Lists, Trees, Graphs, Hashing, Heaps, Time Complexity, Output Prediction, Pointer Analysis, Greedy, Dynamic Programming, Divide & Conquer, Backtracking, NP-Completeness", "21", "7", "4", "4"},
+            {"Theory of Computation", "Theory of Computation, Compiler Design", "DFA/NFA, Regular Expressions, CFG, PDA, Turing Machines, Decidability, Parsing, Lexical Analysis, LR Parsing, Syntax Trees, Intermediate Code Generation", "36", "4", "2", "3"},
+            {"Operating Systems & DBMS", "Operating Systems, Databases (DBMS)", "CPU Scheduling, Deadlocks, Memory Management, Paging, Synchronization, Semaphores, SQL, Normalization, Transactions, Concurrency Control, Serializability, Indexing", "45", "6", "3", "3"},
+            {"Networks, COA & Logic", "Computer Networks, Computer Organization & Architecture (COA), Digital Logic", "TCP/IP, Routing, Congestion Control, Subnetting, Pipelining, Cache Memory, Cache Calculations, Addressing Modes, K-map, Sequential Circuits, Flip-flops", "57", "4", "2", "3"}
+        };
+
+        BigDecimal aggregatedTotalMarks = BigDecimal.ZERO;
+
+        for (int i = 0; i < segments.length; i++) {
+            String[] seg = segments[i];
+            String segmentName = seg[0];
+            String subjects = seg[1];
+            String syllabusFocus = seg[2];
+            String startSeq = seg[3];
+            String mcqCount = seg[4];
+            String msqCount = seg[5];
+            String natCount = seg[6];
+
+            int stepNo = i + 1;
+            int percent = (stepNo * 100) / segments.length;
+            
+            // Notify progress
+            progressCallback.accept(String.format("{\"step\": %d, \"message\": \"Compiling %s Section...\", \"percent\": %d}", stepNo, segmentName, percent));
+
+            try {
+                // RAG context retrieval
+                List<Document> contextDocs = ragIngestionService.retrieveSimilarQuestions(subjects + " " + syllabusFocus, 5);
+                String contextQuestions = IntStream.range(0, contextDocs.size())
+                    .mapToObj(idx -> (idx + 1) + ". " + contextDocs.get(idx).getText())
+                    .collect(Collectors.joining("\n\n"));
+
+                // Render segment prompt
+                String prompt = loadSegmentTemplate()
+                    .replace("{segmentName}", segmentName)
+                    .replace("{subjects}", subjects)
+                    .replace("{syllabusFocus}", syllabusFocus)
+                    .replace("{startSequenceNo}", startSeq)
+                    .replace("{mcqCount}", mcqCount)
+                    .replace("{msqCount}", msqCount)
+                    .replace("{natCount}", natCount)
+                    .replace("{contextCount}", String.valueOf(contextDocs.size()))
+                    .replace("{contextQuestions}", contextQuestions);
+
+                // Call Gemini LLM
+                String rawJson = chatClient.prompt()
+                    .user(prompt)
+                    .call()
+                    .content();
+
+                String cleaned = rawJson.trim()
+                    .replaceAll("^```json\\s*", "")
+                    .replaceAll("^```\\s*", "")
+                    .replaceAll("```$", "")
+                    .trim();
+
+                AiGeneratedQuestionsListDto listDto = objectMapper.readValue(cleaned, AiGeneratedQuestionsListDto.class);
+
+                // Persist segment questions
+                for (AiGeneratedQuestionDto qDto : listDto.getQuestions()) {
+                    Question question = Question.builder()
+                        .test(test)
+                        .questionText(qDto.getQuestionText())
+                        .type(QuestionType.valueOf(qDto.getType()))
+                        .marks(BigDecimal.valueOf(qDto.getMarks()))
+                        .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
+                        .correctNatValue(qDto.getCorrectNatValue())
+                        .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
+                        .sequenceNo(qDto.getSequenceNo())
+                        .explanation(qDto.getExplanation())
+                        .build();
+
+                    question = questionRepository.save(question);
+                    aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
+
+                    if (qDto.getOptions() != null) {
+                        for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
+                            Option opt = Option.builder()
+                                .question(question)
+                                .optionLabel(oDto.getLabel().charAt(0))
+                                .optionText(oDto.getText())
+                                .isCorrect(oDto.isCorrect())
+                                .build();
+                            opt = optionRepository.save(opt);
+                            question.getOptions().add(opt);
+                        }
+                    }
+                    test.getQuestions().add(question);
+                }
+
+            } catch (Exception e) {
+                log.error("Failed to compile segment {}: {}", segmentName, e.getMessage(), e);
+                throw new RuntimeException("AI Segment Compilation failed: " + e.getMessage(), e);
+            }
+        }
+
+        test.setTotalMarks(aggregatedTotalMarks);
+        test = mockTestRepository.save(test);
+
+        log.info("Full 65-Question GATE CSE AI Paper compilation complete! Total Questions: {}, Total Marks: {}", 
+            test.getQuestions().size(), test.getTotalMarks());
+
+        return test;
+    }
+
     private String loadTemplate() {
         try {
             return new String(promptTemplate.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException("Could not load prompt template", e);
         }
+    }
+
+    private String loadSegmentTemplate() {
+        try {
+            return new String(segmentPromptTemplate.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not load segment prompt template", e);
+        }
+    }
+
+    @lombok.Data
+    public static class AiGeneratedQuestionsListDto {
+        private List<AiGeneratedQuestionDto> questions;
     }
 }
