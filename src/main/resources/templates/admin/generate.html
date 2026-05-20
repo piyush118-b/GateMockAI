@@ -143,7 +143,7 @@
         <!-- Standard Loading Overlay -->
         <div id="aiLoadingOverlay" class="loading-overlay">
             <div class="ai-spinner"></div>
-            <div class="ai-loading-text">Gemini AI Generating Questions...</div>
+            <div class="ai-loading-text">Ollama Local AI Generating Questions...</div>
             <div class="ai-loading-subtext" id="aiLoadingMessage">Running similarity search on local RAG seeds, generating technical MCQ/MSQ/NAT papers, and rendering conceptual explanations. Please wait ~15 seconds.</div>
         </div>
 
@@ -171,7 +171,7 @@
 
         <div class="dashboard-hero">
             <h1>AI Mock Test Generator</h1>
-            <p>Leverage Google Gemini 2.0 Flash to synthesize custom, GATE-caliber questions seeded with authentic past paper concepts retrieved from the vector store.</p>
+            <p>Leverage local Ollama Qwen2.5-Coder to synthesize custom, GATE-caliber questions seeded with authentic past paper concepts retrieved from the vector store.</p>
         </div>
 
         <!-- Success/Error Alerts -->
@@ -263,7 +263,7 @@
                 <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
                     <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem; font-size: 1rem;">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        Generate Custom Quiz with Gemini AI
+                        Generate Custom Quiz with Ollama AI
                     </button>
                 </div>
             </form>
@@ -335,8 +335,8 @@
                 
                 const messages = [
                     "Querying local SimpleVectorStore for top technical seeds...",
-                    "Context retrieved. Injecting prompt into Gemini templates...",
-                    "Contacting Gemini chat model (gemini-2.5-flash)...",
+                    "Context retrieved. Injecting prompt into Ollama templates...",
+                    "Contacting Ollama local chat model (qwen2.5-coder:7b)...",
                     "Synthesizing mathematically rigorous MCQs, MSQs, and NATs...",
                     "Generating structural explanations and grading boundaries...",
                     "Parsing strict JSON schema response on local server...",
