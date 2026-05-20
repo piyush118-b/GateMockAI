@@ -145,7 +145,10 @@ public class AdminRagController {
                     
                     Ensure:
                     - Return ONLY clean raw JSON. No markdown backticks.
+                    - CRITICAL: Extract ONLY the actual, real academic exam questions physically written inside "RAW QUESTION PAPER SEGMENT TEXT".
+                    - CRITICAL: Do NOT generate or invent any dummy questions, placeholder questions, general knowledge questions (e.g., "Capital of France", "prime number", "chemical symbol for water", "Red Planet"), or repeat the same question multiple times.
                     - If no questions are found in this text segment, return an empty array: {"questions": []}
+                    - If a segment contains only a few questions, extract exactly only those questions.
                     - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
                     - MSQ: multiple options marked correct based on Answer Key source context.
                     - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
