@@ -24,6 +24,9 @@ public class MockTestGenerationServiceTest {
     @Autowired
     private MockTestGenerationService mockTestGenerationService;
 
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
+
     @MockBean
     private ChatClient chatClient;
 
@@ -129,5 +132,55 @@ public class MockTestGenerationServiceTest {
         assertThat(q3.getCorrectNatValue()).isEqualTo(4.0);
         assertThat(q3.getNatTolerance()).isEqualTo(0.0);
         assertThat(q3.getOptions()).isEmpty();
+    }
+
+    @Test
+    public void testCorrectNatValueArrayDeserialization() throws Exception {
+        String jsonWithArray = """
+            {
+              "sequenceNo": 12,
+              "type": "NAT",
+              "questionText": "Calculate NAT range.",
+              "marks": 2.0,
+              "negativeMarks": 0.0,
+              "correctNatValue": [4.5, 4.6],
+              "explanation": "Test array range"
+            }
+            """;
+        
+        com.gate.mockexam.dto.AiGeneratedQuestionDto dto = objectMapper.readValue(jsonWithArray, com.gate.mockexam.dto.AiGeneratedQuestionDto.class);
+        assertThat(dto.getCorrectNatValue()).isEqualTo(4.55);
+        assertThat(dto.getNatTolerance()).isEqualTo(0.05);
+
+        String jsonWithStringArray = """
+            {
+              "sequenceNo": 13,
+              "type": "NAT",
+              "questionText": "Calculate NAT range as string.",
+              "marks": 2.0,
+              "negativeMarks": 0.0,
+              "correctNatValue": "[4.5, 4.6]",
+              "explanation": "Test string array range"
+            }
+            """;
+        
+        com.gate.mockexam.dto.AiGeneratedQuestionDto dto2 = objectMapper.readValue(jsonWithStringArray, com.gate.mockexam.dto.AiGeneratedQuestionDto.class);
+        assertThat(dto2.getCorrectNatValue()).isEqualTo(4.55);
+        assertThat(dto2.getNatTolerance()).isEqualTo(0.05);
+
+        String jsonWithDouble = """
+            {
+              "sequenceNo": 14,
+              "type": "NAT",
+              "questionText": "Calculate NAT double.",
+              "marks": 2.0,
+              "negativeMarks": 0.0,
+              "correctNatValue": 4.5,
+              "explanation": "Test normal double"
+            }
+            """;
+        
+        com.gate.mockexam.dto.AiGeneratedQuestionDto dto3 = objectMapper.readValue(jsonWithDouble, com.gate.mockexam.dto.AiGeneratedQuestionDto.class);
+        assertThat(dto3.getCorrectNatValue()).isEqualTo(4.5);
     }
 }

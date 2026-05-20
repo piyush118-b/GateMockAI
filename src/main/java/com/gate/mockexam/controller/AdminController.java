@@ -8,6 +8,7 @@ import com.gate.mockexam.repository.BranchRepository;
 import com.gate.mockexam.service.MockTestGenerationService;
 import com.gate.mockexam.service.MockTestService;
 import com.gate.mockexam.service.RagIngestionService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
@@ -25,8 +26,8 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
-@Controller
-@RequestMapping("/admin")
+// @Controller
+// @RequestMapping("/admin")
 @Slf4j
 public class AdminController {
 
@@ -34,6 +35,7 @@ public class AdminController {
     private final RagIngestionService ragIngestionService;
     private final MockTestGenerationService generationService;
     private final BranchRepository branchRepository;
+    private final ObjectMapper objectMapper;
 
     @Value("${gate.rag.vector-store-path}")
     private String vectorStorePath;
@@ -41,11 +43,13 @@ public class AdminController {
     public AdminController(MockTestService mockTestService,
                            RagIngestionService ragIngestionService,
                            MockTestGenerationService generationService,
-                           BranchRepository branchRepository) {
+                           BranchRepository branchRepository,
+                           ObjectMapper objectMapper) {
         this.mockTestService = mockTestService;
         this.ragIngestionService = ragIngestionService;
         this.generationService = generationService;
         this.branchRepository = branchRepository;
+        this.objectMapper = objectMapper;
     }
 
     @GetMapping("/dashboard")
@@ -71,10 +75,15 @@ public class AdminController {
 
     // GET /admin/tests/generate — show the form (loaded from DB)
     @GetMapping("/tests/generate")
+    @org.springframework.transaction.annotation.Transactional
     public String generateForm(Model model) {
         model.addAttribute("pageTitle", "AI Exam Generator");
         model.addAttribute("request", new MockTestGenerationRequestDto());
         List<Branch> branches = branchRepository.findAll();
+        // Eager load the subjects collection for Thymeleaf rendering
+        for (Branch b : branches) {
+            b.getSubjects().size();
+        }
         model.addAttribute("branches", branches);
         // Default to first branch (CSE)
         if (!branches.isEmpty()) {
@@ -82,6 +91,7 @@ public class AdminController {
         }
         return "admin/generate";
     }
+
 
     // POST /admin/tests/generate — trigger AI custom-topic generation
     @PostMapping("/tests/generate")
@@ -206,4 +216,63 @@ public class AdminController {
 
         return emitter;
     }
+
+    // GET /admin/tests/generate/progress/weighted — Asynchronous custom dynamic weightage compiler streaming
+    @GetMapping("/tests/generate/progress/weighted")
+    public SseEmitter streamWeightedPaperGeneration(
+            @RequestParam String branchCode,
+            @RequestParam String yearLabel,
+            @RequestParam String weightagesJson) {
+        SseEmitter emitter = new SseEmitter(600_000L); // 10 minutes timeout
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                // Parse weightagesJson into Map<String, Integer>
+                java.util.Map<String, Integer> subjectWeightages = new java.util.LinkedHashMap<>();
+                try {
+                    subjectWeightages = objectMapper.readValue(weightagesJson, new com.fasterxml.jackson.core.type.TypeReference<java.util.Map<String, Integer>>() {});
+                } catch (Exception parseEx) {
+                    log.error("Failed to parse weightages JSON: {}", weightagesJson, parseEx);
+                    // Fallback parse if it's sent as a flat string key:val,key:val
+                    String[] pairs = weightagesJson.split(",");
+                    for (String pair : pairs) {
+                        String[] kv = pair.split(":");
+                        if (kv.length == 2) {
+                            subjectWeightages.put(kv[0].trim(), Integer.parseInt(kv[1].trim()));
+                        }
+                    }
+                }
+
+                MockTest test = generationService.generateWeightedGatePaper(branchCode, yearLabel, subjectWeightages, progressJson -> {
+                    try {
+                        emitter.send(SseEmitter.event()
+                            .name("progress")
+                            .data(progressJson));
+                    } catch (IOException e) {
+                        log.error("Failed to send SSE progress", e);
+                    }
+                });
+
+                // Send final completion message with redirect url
+                emitter.send(SseEmitter.event()
+                    .name("complete")
+                    .data("/admin/tests/" + test.getId()));
+                emitter.complete();
+
+            } catch (Exception e) {
+                log.error("AI Weighted Paper compilation failed asynchronously", e);
+                try {
+                    emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(e.getMessage() != null ? e.getMessage() : "Unknown compilation error"));
+                } catch (IOException ioException) {
+                    log.error("Failed to send SSE error notification", ioException);
+                }
+                emitter.completeWithError(e);
+            }
+        });
+
+        return emitter;
+    }
 }
+

@@ -18,8 +18,8 @@ import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Controller
-@RequestMapping("/student")
+// @Controller
+// @RequestMapping("/student")
 @Slf4j
 public class StudentExamController {
 
@@ -85,9 +85,20 @@ public class StudentExamController {
             // Fetch questions sorted by sequence number
             List<Question> questions = questionRepository.findByTestIdOrderBySequenceNoAsc(testId);
 
+            // Create a lightweight list of maps to prevent infinite recursion loop of JPA entities during JS inlining
+            List<Map<String, Object>> questionsMeta = questions.stream()
+                    .map(q -> {
+                        Map<String, Object> map = new HashMap<>();
+                        map.put("id", q.getId().toString());
+                        map.put("type", q.getType().name());
+                        return map;
+                    })
+                    .collect(Collectors.toList());
+
             model.addAttribute("test", test);
             model.addAttribute("attempt", attempt);
             model.addAttribute("questions", questions);
+            model.addAttribute("questionsMeta", questionsMeta);
             model.addAttribute("pageTitle", "Mock Exam: " + test.getTitle());
 
             return "student/take";

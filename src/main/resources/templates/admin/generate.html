@@ -135,10 +135,63 @@
             letter-spacing: 0.05em;
             margin-top: 0.25rem;
         }
+        
+        /* Dynamic Subject Weightage Styling */
+        .subject-weightage-row:hover {
+            transform: translateY(-2px);
+            background: rgba(255, 255, 255, 0.04) !important;
+            border-color: rgba(99, 102, 241, 0.3) !important;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        .weightage-slider {
+            height: 6px;
+            border-radius: 3px;
+            outline: none;
+            transition: all 0.2s ease;
+            width: 100%;
+        }
+        .weightage-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 10px rgba(99, 102, 241, 0.8);
+            cursor: pointer;
+            transition: transform 0.1s ease;
+        }
+        .weightage-slider::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+        }
+        .tracker-bar {
+            position: sticky;
+            bottom: 0;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(12px);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            padding: 1.5rem 2rem;
+            margin: 2rem -2.5rem -2.5rem -2.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 100;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
     </style>
 </head>
 <body>
     <div th:fragment="content" style="max-width: 900px; margin: 0 auto;">
+        
+        <!-- Eager Loaded Branch Subjects Data Block -->
+        <div id="branchSubjectsData" style="display: none;">
+            <div th:each="br : ${branches}" th:id="'data-branch-' + ${br.code}">
+                <div th:each="sb : ${br.subjects}" 
+                     th:data-name="${sb.name}" 
+                     th:data-weightage="${sb.defaultMarksWeightage}">
+                </div>
+            </div>
+        </div>
         
         <!-- Standard Loading Overlay -->
         <div id="aiLoadingOverlay" class="loading-overlay">
@@ -157,7 +210,7 @@
                 <div id="fullExamProgressBar" class="progress-bar-fill"></div>
             </div>
             
-            <div class="ai-loading-subtext" id="fullExamProgressMessage" style="font-family: monospace; max-width: 600px; text-align: left; background-color: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); height: 100px; overflow-y: auto;">
+            <div class="ai-loading-subtext" id="fullExamProgressMessage" style="font-family: monospace; max-width: 600px; text-align: left; background-color: rgba(0,0,0,0.3); padding: 1rem; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); height: 120px; overflow-y: auto;">
                 [System] Initializing RAG compiler...
             </div>
         </div>
@@ -216,60 +269,323 @@
             </button>
         </div>
 
-        <!-- SECONDARY SECTION: CUSTOM TOPIC GENERATION FORM -->
+        <!-- DYNAMIC BRANCH & SUBJECT WEIGHTAGE FORM -->
         <div class="card" style="max-width: 100%;">
             <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 2rem;">
-                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">AI Custom Topic Generation</h2>
-                <p style="color: var(--text-secondary); font-size: 0.85rem;">Generate an ad-hoc custom review quiz for specific learning topics.</p>
+                <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">AI Weighted Syllabus Generator</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem;">Select your engineering branch, adjust subject weightages dynamically, or add custom subjects. The AI compiler will dynamically synthesize the exam based strictly on marks distribution.</p>
             </div>
 
-            <form th:action="@{/admin/tests/generate}" th:object="${request}" method="post" id="generatorForm">
-                <!-- Subject selection -->
-                <div class="form-group">
-                    <label class="form-label" for="subject">Subject Area</label>
-                    <select id="subject" th:field="*{subject}" class="form-control">
-                        <option value="">-- Choose Subject --</option>
-                        <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub}"></option>
-                    </select>
-                    <div class="form-error" th:if="${#fields.hasErrors('subject')}" th:errors="*{subject}"></div>
-                </div>
-
-                <!-- Topic field -->
-                <div class="form-group">
-                    <label class="form-label" for="topic">Target Topic</label>
-                    <input type="text" id="topic" th:field="*{topic}" class="form-control" placeholder="e.g., CPU Scheduling, Relational Algebra, IP Subnetting, CFG Ambiguity" />
-                    <div class="form-error" th:if="${#fields.hasErrors('topic')}" th:errors="*{topic}"></div>
-                </div>
-
-                <!-- Question Count Spinners -->
-                <div class="input-row" style="margin-top: 1.5rem;">
+            <form id="weightedGeneratorForm" onsubmit="return false;">
+                <div class="grid-cols-2" style="gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <!-- Branch Selection -->
                     <div class="form-group">
-                        <label class="form-label" for="mcqCount">MCQ Count (1 - 20)</label>
-                        <input type="number" id="mcqCount" th:field="*{mcqCount}" min="1" max="20" class="form-control" />
-                        <div class="form-error" th:if="${#fields.hasErrors('mcqCount')}" th:errors="*{mcqCount}"></div>
+                        <label class="form-label" for="branchSelect">Target Engineering Branch</label>
+                        <select id="branchSelect" class="form-control" onchange="initBranchSubjects()">
+                            <option th:each="br : ${branches}" th:value="${br.code}" th:text="${br.name}"></option>
+                        </select>
                     </div>
+
+                    <!-- Exam Year -->
                     <div class="form-group">
-                        <label class="form-label" for="msqCount">MSQ Count (0 - 10)</label>
-                        <input type="number" id="msqCount" th:field="*{msqCount}" min="0" max="10" class="form-control" />
-                        <div class="form-error" th:if="${#fields.hasErrors('msqCount')}" th:errors="*{msqCount}"></div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="natCount">NAT Count (0 - 10)</label>
-                        <input type="number" id="natCount" th:field="*{natCount}" min="0" max="10" class="form-control" />
-                        <div class="form-error" th:if="${#fields.hasErrors('natCount')}" th:errors="*{natCount}"></div>
+                        <label class="form-label" for="yearLabel">GATE Exam Year Label</label>
+                        <input type="text" id="yearLabel" class="form-control" value="2026" placeholder="e.g., 2026, 2020" />
                     </div>
                 </div>
 
-                <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
-                    <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem; font-size: 1rem;">
+                <!-- Subjects weightage distribution list -->
+                <div style="margin-top: 2rem;">
+                    <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                        Subject Marks Weightage Distribution
+                        <span style="font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);">Select and allocate marks per subject (0 - 30)</span>
+                    </h3>
+                    
+                    <div id="subjectsContainer" style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1.5rem;">
+                        <!-- Dynamic rows will be inserted here by Javascript -->
+                    </div>
+                </div>
+
+                <!-- Add custom subject panel -->
+                <div style="display: flex; gap: 1rem; background: rgba(255,255,255,0.01); padding: 1.2rem; border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1); align-items: center; margin-bottom: 2rem;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-secondary);"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+                    <input type="text" id="customSubjectName" class="form-control" style="flex: 1;" placeholder="Add custom subject (e.g., Artificial Intelligence, Web Technology)..." />
+                    <button type="button" class="btn btn-secondary" style="white-space: nowrap;" onclick="addCustomSubject()">+ Add Subject</button>
+                </div>
+
+                <!-- Warning Banner -->
+                <div id="totalMarksWarning" class="alert alert-danger" style="margin-top: 1.5rem; display: none; background-color: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #fde68a;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align: middle; margin-right: 6px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    GATE papers standardly require exactly 100 marks. Current total allocated: <strong id="currentMarksWarningVal">0</strong> Marks.
+                </div>
+
+                <!-- Sticky tracker bar inside card -->
+                <div class="tracker-bar">
+                    <div style="flex: 1; max-width: 400px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 0.5rem; font-size: 0.95rem;">
+                            <span style="font-weight: 700; color: #ffffff;">Allocated Marks: <span id="totalMarksText" style="color: var(--primary); font-size: 1.15rem;">0</span> / 100</span>
+                        </div>
+                        <div style="width: 100%; background: rgba(255,255,255,0.05); height: 8px; border-radius: 4px; overflow: hidden;">
+                            <div id="totalMarksMeter" style="width: 0%; height: 100%; background: var(--primary); transition: width 0.3s ease;"></div>
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-primary" style="padding: 0.9rem 2.5rem; font-size: 1.05rem; font-weight: 700; gap: 0.5rem; display: flex; align-items: center;" onclick="triggerWeightedExamGeneration()">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        Generate Custom Quiz with Ollama AI
+                        Compile Dynamic GATE Paper
                     </button>
                 </div>
             </form>
         </div>
 
         <script>
+            // Parse branch-subjects metadata dynamically from hidden DOM
+            const branchesData = [];
+            document.querySelectorAll('#branchSubjectsData > div').forEach(branchDiv => {
+                const code = branchDiv.id.replace('data-branch-', '');
+                const subjects = [];
+                branchDiv.querySelectorAll('div').forEach(subDiv => {
+                    subjects.push({
+                        name: subDiv.getAttribute('data-name'),
+                        defaultMarksWeightage: parseInt(subDiv.getAttribute('data-weightage')) || 0
+                    });
+                });
+                branchesData.push({
+                    code: code,
+                    subjects: subjects
+                });
+            });
+
+            let activeSubjects = [];
+
+            function initBranchSubjects() {
+                const branchSelector = document.getElementById('branchSelect');
+                if (!branchSelector) return;
+                const selectedCode = branchSelector.value;
+                const branch = branchesData.find(b => b.code === selectedCode);
+                
+                if (branch && branch.subjects) {
+                    activeSubjects = branch.subjects.map(s => ({
+                        name: s.name,
+                        weightage: s.defaultMarksWeightage,
+                        enabled: true
+                    }));
+                } else {
+                    activeSubjects = [];
+                }
+                renderSubjects();
+            }
+
+            function renderSubjects() {
+                const container = document.getElementById('subjectsContainer');
+                container.innerHTML = '';
+                
+                activeSubjects.forEach((subject, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'subject-weightage-row';
+                    row.style = `
+                        display: grid;
+                        grid-template-columns: 2.2fr 3fr 70px 40px;
+                        align-items: center;
+                        gap: 1.5rem;
+                        background: rgba(255,255,255,0.02);
+                        padding: 0.8rem 1.5rem;
+                        border-radius: 12px;
+                        border: 1px solid rgba(255,255,255,0.05);
+                        transition: all 0.2s ease;
+                        opacity: ${subject.enabled ? 1 : 0.4};
+                    `;
+                    
+                    // Subject Name
+                    const nameLabel = document.createElement('div');
+                    nameLabel.style = 'font-weight: 600; color: #ffffff; font-size: 0.95rem; word-break: break-word;';
+                    nameLabel.textContent = subject.name;
+                    row.appendChild(nameLabel);
+                    
+                    // Slider
+                    const slider = document.createElement('input');
+                    slider.type = 'range';
+                    slider.min = '0';
+                    slider.max = '30';
+                    slider.value = subject.weightage;
+                    slider.disabled = !subject.enabled;
+                    slider.className = 'weightage-slider';
+                    slider.addEventListener('input', (e) => {
+                        subject.weightage = parseInt(e.target.value);
+                        numberInput.value = e.target.value;
+                        updateTotalMarks();
+                    });
+                    row.appendChild(slider);
+                    
+                    // Number Input
+                    const numberInput = document.createElement('input');
+                    numberInput.type = 'number';
+                    numberInput.min = '0';
+                    numberInput.max = '100';
+                    numberInput.value = subject.weightage;
+                    numberInput.disabled = !subject.enabled;
+                    numberInput.className = 'form-control';
+                    numberInput.style = 'padding: 0.35rem 0.5rem; text-align: center; font-weight: 700; font-size: 0.9rem;';
+                    numberInput.addEventListener('input', (e) => {
+                        let val = parseInt(e.target.value) || 0;
+                        val = Math.max(0, Math.min(100, val));
+                        subject.weightage = val;
+                        slider.value = Math.min(30, val);
+                        updateTotalMarks();
+                    });
+                    row.appendChild(numberInput);
+                    
+                    // Delete/Exclude Button
+                    const toggleBtn = document.createElement('button');
+                    toggleBtn.type = 'button';
+                    toggleBtn.className = subject.enabled ? 'btn btn-secondary' : 'btn btn-primary';
+                    toggleBtn.style = 'padding: 0.4rem 0; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 700; width: 36px; height: 36px; min-width: 36px; border-radius: 8px;';
+                    toggleBtn.innerHTML = subject.enabled ? '✕' : '＋';
+                    toggleBtn.addEventListener('click', () => {
+                        subject.enabled = !subject.enabled;
+                        if (!subject.enabled) {
+                            subject.weightage = 0;
+                            slider.value = 0;
+                            numberInput.value = 0;
+                        } else {
+                            const defaultSub = branchesData.find(b => b.code === document.getElementById('branchSelect').value)
+                                ?.subjects.find(s => s.name === subject.name);
+                            subject.weightage = defaultSub ? defaultSub.defaultMarksWeightage : 10;
+                            slider.value = subject.weightage;
+                            numberInput.value = subject.weightage;
+                        }
+                        renderSubjects();
+                    });
+                    row.appendChild(toggleBtn);
+                    
+                    container.appendChild(row);
+                });
+                
+                updateTotalMarks();
+            }
+
+            function addCustomSubject() {
+                const input = document.getElementById('customSubjectName');
+                const name = input.value.trim();
+                if (!name) return;
+                
+                // Check if duplicate
+                if (activeSubjects.some(s => s.name.toLowerCase() === name.toLowerCase())) {
+                    alert('Subject area already included in list!');
+                    return;
+                }
+                
+                activeSubjects.push({
+                    name: name,
+                    weightage: 10,
+                    enabled: true
+                });
+                
+                input.value = '';
+                renderSubjects();
+            }
+
+            function updateTotalMarks() {
+                const total = activeSubjects.reduce((sum, s) => sum + (s.enabled ? s.weightage : 0), 0);
+                const totalText = document.getElementById('totalMarksText');
+                const totalMeter = document.getElementById('totalMarksMeter');
+                const warningBanner = document.getElementById('totalMarksWarning');
+                const warningVal = document.getElementById('currentMarksWarningVal');
+                
+                if (totalText) totalText.textContent = total;
+                if (totalMeter) totalMeter.style.width = Math.min(100, (total * 100) / 100) + '%';
+                
+                if (total === 100) {
+                    if (totalMeter) totalMeter.style.background = 'linear-gradient(90deg, #10b981 0%, #059669 100%)';
+                    if (warningBanner) warningBanner.style.display = 'none';
+                } else {
+                    if (totalMeter) totalMeter.style.background = 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)';
+                    if (warningBanner) warningBanner.style.display = 'block';
+                    if (warningVal) warningVal.textContent = total;
+                }
+            }
+
+            // SSE Weighted Dynamic Exam Generation Engine
+            function triggerWeightedExamGeneration() {
+                const branchCode = document.getElementById('branchSelect').value;
+                const yearLabel = document.getElementById('yearLabel').value.trim();
+                
+                if (!yearLabel) {
+                    alert('Please enter a valid exam year label.');
+                    return;
+                }
+                
+                const enabledWeightages = {};
+                activeSubjects.forEach(s => {
+                    if (s.enabled && s.weightage > 0) {
+                        enabledWeightages[s.name] = s.weightage;
+                    }
+                });
+                
+                if (Object.keys(enabledWeightages).length === 0) {
+                    alert('Please configure marks weightage for at least one subject!');
+                    return;
+                }
+
+                const overlay = document.getElementById('fullExamLoadingOverlay');
+                const progressBar = document.getElementById('fullExamProgressBar');
+                const percentText = document.getElementById('fullExamPercentText');
+                const progressMessage = document.getElementById('fullExamProgressMessage');
+                const statusTitle = document.getElementById('fullExamStatusTitle');
+
+                overlay.classList.add('active');
+                statusTitle.textContent = `Compiling Custom GATE ${branchCode} Paper...`;
+                progressMessage.innerHTML = "[System] Initializing RAG compiler threads...<br>";
+
+                // URL-encode parameter weightages JSON map
+                const weightagesJson = JSON.stringify(enabledWeightages);
+                const url = `/admin/tests/generate/progress/weighted?branchCode=${encodeURIComponent(branchCode)}&yearLabel=${encodeURIComponent(yearLabel)}&weightagesJson=${encodeURIComponent(weightagesJson)}`;
+
+                // Initialize Server-Sent Events stream
+                const eventSource = new EventSource(url);
+
+                eventSource.addEventListener('progress', function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        progressBar.style.width = data.percent + '%';
+                        percentText.textContent = 'Progress: ' + data.percent + '%';
+                        progressMessage.innerHTML += `[RAG Compiler] Segment ${data.step}: ${data.message}<br>`;
+                        progressMessage.scrollTop = progressMessage.scrollHeight;
+                    } catch (err) {
+                        console.error("Failed to parse progress event data", err);
+                    }
+                });
+
+                eventSource.addEventListener('complete', function(e) {
+                    eventSource.close();
+                    progressMessage.innerHTML += `[System] Compilation finished! Redirecting to dashboard details...<br>`;
+                    progressBar.style.width = '100%';
+                    percentText.textContent = 'Progress: 100%';
+                    
+                    setTimeout(() => {
+                        window.location.href = e.data;
+                    }, 1000);
+                });
+
+                eventSource.addEventListener('error', function(e) {
+                    eventSource.close();
+                    statusTitle.textContent = "Compilation Failed!";
+                    statusTitle.style.color = "var(--danger)";
+                    progressMessage.innerHTML += `<span style="color: var(--danger);">[Error] Generative compile failed: ${e.data || 'Connection closed/timed out.'}</span><br>`;
+                    
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-secondary';
+                    btn.textContent = 'Close and Retry';
+                    btn.style.marginTop = '1rem';
+                    btn.onclick = () => {
+                        overlay.classList.remove('active');
+                        btn.remove();
+                        statusTitle.textContent = "Compiling Full GATE CSE Exam...";
+                        statusTitle.style.color = "#ffffff";
+                    };
+                    overlay.appendChild(btn);
+                });
+            }
+
             // SSE Full Exam Generation Engine
             function triggerFullExamGeneration() {
                 const overlay = document.getElementById('fullExamLoadingOverlay');
@@ -281,7 +597,6 @@
                 overlay.classList.add('active');
                 progressMessage.innerHTML = "[System] Initializing RAG compiler threads...<br>";
 
-                // Initialize Server-Sent Events stream
                 const eventSource = new EventSource('/admin/tests/generate/progress');
 
                 eventSource.addEventListener('progress', function(e) {
@@ -327,51 +642,12 @@
                 });
             }
 
-            // Custom Topic Form Overlay
-            document.addEventListener('DOMContentLoaded', function() {
-                const form = document.getElementById('generatorForm');
-                const overlay = document.getElementById('aiLoadingOverlay');
-                const msg = document.getElementById('aiLoadingMessage');
-                
-                const messages = [
-                    "Querying local SimpleVectorStore for top technical seeds...",
-                    "Context retrieved. Injecting prompt into Ollama templates...",
-                    "Contacting Ollama local chat model (qwen2.5-coder:7b)...",
-                    "Synthesizing mathematically rigorous MCQs, MSQs, and NATs...",
-                    "Generating structural explanations and grading boundaries...",
-                    "Parsing strict JSON schema response on local server...",
-                    "Saving test entities and options to PostgreSQL tables..."
-                ];
-                
-                let isSubmitting = false;
-                form.addEventListener('submit', function(e) {
-                    if (isSubmitting) return;
-
-                    const subjectVal = document.getElementById('subject').value;
-                    const topicVal = document.getElementById('topic').value.trim();
-                    if (!subjectVal || !topicVal) return;
-
-                    e.preventDefault();
-                    isSubmitting = true;
-                    overlay.classList.add('active');
-                    
-                    let step = 0;
-                    const interval = setInterval(() => {
-                        if (step < messages.length) {
-                            msg.textContent = messages[step];
-                            step++;
-                        } else {
-                            msg.textContent = "Finalizing data commitment... Almost done!";
-                            clearInterval(interval);
-                        }
-                    }, 2200);
-
-                    setTimeout(() => {
-                        form.submit();
-                    }, 150);
-                });
+            // Initialize on startup
+            document.addEventListener('DOMContentLoaded', () => {
+                initBranchSubjects();
             });
         </script>
     </div>
 </body>
 </html>
+

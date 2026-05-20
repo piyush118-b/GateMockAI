@@ -6,8 +6,8 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-@Controller
-@RequestMapping("/student")
+// @Controller
+// @RequestMapping("/student")
 public class ExamController {
 
     private final MockTestService mockTestService;

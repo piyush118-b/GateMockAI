@@ -6,33 +6,45 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title th:text="${pageTitle != null ? pageTitle + ' | GATE MockAI' : 'GATE MockAI'}">GATE MockAI</title>
-  <link rel="stylesheet" th:href="@{/css/main.css}">
+  
+  <!-- Use Vite built index.css which includes Tailwind -->
+  <link rel="stylesheet" th:href="@{/assets/index.css}">
+  <!-- Inter font for premium feel -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-  <nav class="navbar">
-    <a class="brand" th:href="@{/home}">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align: middle; margin-right: 4px;">
-        <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="url(#brandGrad)" />
-        <path d="M2 17L12 22L22 17" stroke="url(#brandGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        <path d="M2 12L12 17L22 12" stroke="url(#brandGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-        <defs>
-          <linearGradient id="brandGrad" x1="2" y1="2" x2="22" y2="22" gradientUnits="userSpaceOnUse">
-            <stop stop-color="#4f46e5" />
-            <stop offset="1" stop-color="#06b6d4" />
-          </linearGradient>
-        </defs>
-      </svg>
-      GATE MockAI
-    </a>
-    <div class="nav-links">
-      <span sec:authorize="isAuthenticated()" th:text="${#authentication.principal.username}"></span>
-      <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/dashboard}">Admin Panel</a>
-      <a sec:authorize="hasRole('STUDENT')" th:href="@{/student/tests}">Tests</a>
-      <a sec:authorize="hasRole('STUDENT')" th:href="@{/dashboard}">Dashboard</a>
-      <a sec:authorize="isAuthenticated()" th:href="@{/logout}" class="logout">Logout</a>
+<body class="text-slate-800 font-sans antialiased min-h-screen flex flex-col relative overflow-x-hidden selection:bg-indigo-500 selection:text-white bg-[#f8fafc]">
+
+  <!-- Background decorative elements for light mode -->
+  <div class="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+    <div class="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] rounded-full bg-indigo-300/30 blur-[120px]"></div>
+    <div class="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] rounded-full bg-cyan-300/30 blur-[120px]"></div>
+  </div>
+
+  <nav class="relative z-10 border-b border-slate-200/60 bg-white/70 backdrop-blur-md sticky top-0 w-full shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        <a class="flex items-center gap-2 group" th:href="@{/home}">
+          <div class="p-1.5 rounded-xl bg-gradient-to-br from-indigo-500 to-cyan-400 group-hover:shadow-[0_0_20px_rgba(79,70,229,0.3)] transition-all duration-300">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="text-white">
+              <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor" />
+              <path d="M2 17L12 22L22 17" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M2 12L12 17L22 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+          </div>
+          <span class="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-indigo-900 to-slate-700 tracking-tight">GATE MockAI</span>
+        </a>
+        <div class="flex items-center space-x-6 text-sm font-medium">
+          <span sec:authorize="isAuthenticated()" th:text="${#authentication.principal.username}" class="text-slate-600"></span>
+          <a sec:authorize="hasRole('ADMIN')" th:href="@{/admin/dashboard}" class="text-slate-600 hover:text-indigo-600 transition-colors duration-200">Admin Panel</a>
+          <a sec:authorize="hasRole('STUDENT')" th:href="@{/student/tests}" class="text-slate-600 hover:text-indigo-600 transition-colors duration-200">Tests</a>
+          <a sec:authorize="hasRole('STUDENT')" th:href="@{/student/dashboard}" class="text-slate-600 hover:text-indigo-600 transition-colors duration-200">Dashboard</a>
+          <a sec:authorize="isAuthenticated()" th:href="@{/logout}" class="px-4 py-2 rounded-lg bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-all duration-200 text-slate-700">Logout</a>
+        </div>
+      </div>
     </div>
   </nav>
-  <main class="container" th:replace="${content}"></main>
-  <script th:src="@{/js/main.js}"></script>
+
+  <main class="relative z-10 flex-grow flex flex-col" th:replace="${content}"></main>
+  
 </body>
 </html>

@@ -803,12 +803,21 @@
             .exam-btn-submit {
                 background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
                 color: white;
-                grid-column: span 2;
                 margin-top: 0.5rem;
+                transition: all 0.3s ease;
             }
 
-            .exam-btn-submit:hover {
+            .exam-btn-submit:not(:disabled):hover {
                 background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+                transform: translateY(-1px);
+            }
+
+            .exam-btn-submit:disabled {
+                background: #e2e8f0 !important;
+                color: #94a3b8 !important;
+                cursor: not-allowed !important;
+                box-shadow: none !important;
+                border: 1px solid #cbd5e1 !important;
             }
 
             /* FULL SCREEN MODALS */
@@ -937,7 +946,9 @@
                                     <div th:if="${q.type.name() == 'MCQ'}" class="options-grid-container">
                                         <div th:each="opt : ${q.options}" 
                                              th:class="'option-interactive-card option_' + ${q.id}" 
-                                             th:onclick="'selectMcqOption(this, \'' + ${q.id} + '\', \'' + ${opt.id} + '\')'">
+                                             th:data-question-id="${q.id}"
+                                             th:data-option-id="${opt.id}"
+                                             onclick="selectMcqOption(this, this.dataset.questionId, this.dataset.optionId)">
                                             <input type="radio" 
                                                    th:name="'answer_mcq_' + ${q.id}" 
                                                    th:value="${opt.id}" 
@@ -957,7 +968,8 @@
                                     <div th:if="${q.type.name() == 'MSQ'}" class="options-grid-container">
                                         <div th:each="opt : ${q.options}" 
                                              th:class="'option-interactive-card option_' + ${q.id}" 
-                                             th:onclick="'toggleMsqOption(this, \'' + ${opt.id} + '\')'">
+                                             th:data-option-id="${opt.id}"
+                                             onclick="toggleMsqOption(this, this.dataset.optionId)">
                                             <input type="checkbox" 
                                                    th:name="'answer_msq_' + ${q.id}" 
                                                    th:value="${opt.id}" 
@@ -983,7 +995,8 @@
                                                    th:name="'answer_nat_' + ${q.id}" 
                                                    th:id="'nat_' + ${q.id}" 
                                                    placeholder="Enter decimal value" 
-                                                   th:oninput="'saveNatInput(\'' + ${q.id} + '\', this.value)'" />
+                                                   th:data-question-id="${q.id}"
+                                                   oninput="saveNatInput(this.dataset.questionId, this.value)" />
                                         </div>
                                     </div>
 
@@ -1037,13 +1050,29 @@
                                     type="button" 
                                     th:id="'palette_btn_' + ${stat.index}" 
                                     class="palette-btn palette-not-visited" 
-                                    th:text="${stat.index + 1}" 
-                                    th:onclick="'jumpToQuestion(' + ${stat.index} + ')'">1</button>
+                                    th:text="'Q' + ${stat.index + 1}" 
+                                    th:data-index="${stat.index}"
+                                    onclick="jumpToQuestion(parseInt(this.dataset.index))">Q1</button>
+                        </div>
+                    </div>
+
+                    <!-- THREE CORE ACTION BUTTONS BELOW PALETTE -->
+                    <div class="palette-actions-group" style="display: flex; flex-direction: column; gap: 0.75rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                        <button type="button" class="exam-btn exam-btn-primary" onclick="saveAndNext()" style="width: 100%; height: 46px; font-weight: 700; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.5rem; box-shadow: var(--shadow-sm); text-transform: uppercase; letter-spacing: 0.02em;">
+                            Save & Next
+                        </button>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                            <button type="button" class="exam-btn exam-btn-marked" onclick="markForReviewAndNext()" style="height: 44px; font-weight: 600; border-radius: 8px; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.02em;">
+                                Mark for Review
+                            </button>
+                            <button type="button" class="exam-btn exam-btn-clear" onclick="clearActiveResponse()" style="height: 44px; font-weight: 600; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow-sm); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.02em;">
+                                Clear Response
+                            </button>
                         </div>
                     </div>
 
                     <!-- LEGEND GUIDE CARD -->
-                    <div class="legend-guide-card">
+                    <div class="legend-guide-card" style="margin-top: 0.5rem;">
                         <h5>Legend Info</h5>
                         <div class="legend-grid-layout">
                             <div class="legend-badge-item">
@@ -1069,19 +1098,10 @@
                         </div>
                     </div>
 
-                    <!-- SIDEBAR NTA CORE CONTROLS ACTION BLOCK -->
-                    <div class="sidebar-controls-grid">
-                        <button type="button" class="exam-btn exam-btn-primary" onclick="saveAndNext()">
-                            Save & Next
-                        </button>
-                        <button type="button" class="exam-btn exam-btn-marked" onclick="markForReviewAndNext()">
-                            Mark Review
-                        </button>
-                        <button type="button" class="exam-btn exam-btn-clear" onclick="clearActiveResponse()">
-                            Clear Ans
-                        </button>
-                        <button type="button" class="exam-btn exam-btn-submit" onclick="openSubmitModal()">
-                            Submit
+                    <!-- SUBMIT BUTTON AT THE BOTTOM -->
+                    <div style="margin-top: auto; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+                        <button type="button" id="submitExamBtn" class="exam-btn exam-btn-submit" onclick="openSubmitModal()" style="width: 100%; height: 48px; font-weight: 700; border-radius: 8px; border: none; display: flex; align-items: center; justify-content: center; text-transform: uppercase; letter-spacing: 0.03em; transition: all 0.3s ease;" disabled th:text="'Submit Exam'">
+                            Submit Exam
                         </button>
                     </div>
 
@@ -1130,7 +1150,7 @@
         <!-- JAVASCRIPT STATE ENGINE -->
         <script th:inline="javascript">
             /*<![CDATA[*/
-            const questionsList = /*[[${questions}]]*/ [];
+            const questionsList = /*[[${questionsMeta}]]*/ [];
             const durationMinutes = /*[[${test.durationMinutes}]]*/ 180;
             const startedAtStr = /*[[${attempt.startedAt}]]*/ '';
             /*]]>*/
@@ -1190,6 +1210,16 @@
                 document.getElementById('qCounterDisplay').innerText = `Question ${index + 1} of ${totalQuestionsCount}`;
 
                 activeQuestionIndex = index;
+
+                // Adjust Submit button state: only activate on the final question
+                const submitBtn = document.getElementById('submitExamBtn');
+                if (submitBtn) {
+                    if (index === totalQuestionsCount - 1) {
+                        submitBtn.disabled = false;
+                    } else {
+                        submitBtn.disabled = true;
+                    }
+                }
             }
 
             function jumpToQuestion(index) {

@@ -13,8 +13,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.util.Collections;
 import java.util.List;
 
-@Controller
-@RequestMapping("/dashboard")
+// @Controller
+// @RequestMapping("/dashboard")
 public class DashboardController {
 
     private final UserRepository userRepository;

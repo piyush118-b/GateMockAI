@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&family=Roboto:wght@300;400;500;700;900&display=swap');
+
+@import "tailwindcss";
+@config "../tailwind.config.js";
+@source "../../src/main/resources/templates";
+
+/* Core Viewport Resets for Secure Timed Tests */
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  font-family: serif; /* Browser default serif */
+  background-color: #f0f0f0;
+  -webkit-font-smoothing: auto; /* standard rendering */
+  -moz-osx-font-smoothing: auto;
+  user-select: none; /* Block native text copy on host portal */
+}
+
+/* Watermark for question body */
+.nta-watermark {
+  position: relative;
+}
+.nta-watermark::before {
+  content: '4835731301957 4835731301957 4835731301957 4835731301957 4835731301957 4835731301957 4835731301957 4835731301957 4835731301957';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 200%;
+  height: 200%;
+  transform: translate(-25%, -25%) rotate(-30deg);
+  opacity: 0.06;
+  font-size: 48px;
+  color: #000;
+  pointer-events: none;
+  z-index: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  overflow: hidden;
+  line-height: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+.nta-watermark > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom Scrollbars to match dense NTA look */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Custom boxy leaf shapes for palette icons */
+.palette-shape-not-visited {
+  border-radius: 4px;
+}
+
+.palette-shape-not-answered {
+  border-radius: 12px 2px 12px 2px;
+}
+
+.palette-shape-answered {
+  border-radius: 2px 12px 2px 12px;
+}
+
+.palette-shape-marked {
+  border-radius: 9999px;
+}

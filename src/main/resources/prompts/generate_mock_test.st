@@ -13,7 +13,7 @@ Requirements:
 - Match the mathematical rigor and difficulty level of the references exactly
 - MCQ: exactly 4 options (A, B, C, D), exactly one correct. Apply -1/3 negative marking.
 - MSQ: exactly 4 options, 2 or more correct. Zero negative marking. Award 2 marks.
-- NAT: numerical answer, specify exact value and tolerance (usually 0 for integer answers, ±0.01 for decimals). Award 1 mark.
+- NAT: numerical answer, specify exact value (correctNatValue must be a single numeric float or integer, NEVER a JSON array or range) and tolerance (usually 0 for integer answers, ±0.01 for decimals). Award 1 mark.
 - Include a brief explanation for each question.
 
 Return ONLY this exact JSON structure (raw, no markdown fences):

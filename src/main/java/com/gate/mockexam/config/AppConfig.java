@@ -2,11 +2,32 @@ package com.gate.mockexam.config;
 
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.ollama.api.OllamaApi;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
 
 @Configuration
 public class AppConfig {
+
+    @Value("${spring.ai.ollama.base-url:http://localhost:11434}")
+    private String ollamaBaseUrl;
+
+    @Bean
+    public OllamaApi ollamaApi(RestClient.Builder restClientBuilder) {
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(30000); // 30 seconds
+        factory.setReadTimeout(600000);  // 10 minutes
+        
+        RestClient.Builder customizedBuilder = restClientBuilder.clone().requestFactory(factory);
+        
+        return OllamaApi.builder()
+            .baseUrl(ollamaBaseUrl)
+            .restClientBuilder(customizedBuilder)
+            .build();
+    }
 
     @Bean
     public ChatClient chatClient(ChatModel chatModel) {
