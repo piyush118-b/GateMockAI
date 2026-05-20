@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>Review Extracted Paper | GATE MockAI</title>
+    <style th:inline="css">
+        .review-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .q-card {
+            background-color: var(--card-bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+        .q-badge {
+            display: inline-flex;
+            align-items: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            padding: 0.25rem 0.6rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .badge-mcq { background-color: rgba(99, 102, 241, 0.15); color: var(--primary); }
+        .badge-msq { background-color: rgba(16, 185, 129, 0.15); color: #10b981; }
+        .badge-nat { background-color: rgba(245, 158, 11, 0.15); color: #f59e0b; }
+        .opt-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+        }
+        .opt-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 0.9rem;
+        }
+        .opt-correct {
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+        .opt-icon {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            font-weight: 700;
+            font-size: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+        .opt-correct .opt-icon {
+            background-color: #10b981;
+            color: #ffffff;
+            border-color: #10b981;
+        }
+    </style>
+</head>
+<body>
+    <div th:fragment="content">
+        <div style="margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem;">
+            <a th:href="@{/admin/rag}" style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.9rem; font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Cancel and Go Back
+            </a>
+        </div>
+
+        <div class="dashboard-hero">
+            <h1 th:text="${draft.title}">Review Extracted Mock Test</h1>
+            <p>Review the questions, option alignments, and official keys parsed by the local Qwen Coder engine before final database commitment.</p>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 2rem; align-items: start;">
+            <!-- Question list review -->
+            <div>
+                <h2 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: var(--text-primary);">Aligned Question Sheets</h2>
+                <div class="review-grid">
+                    <div class="q-card" th:each="q : ${draft.questions}">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                            <span class="q-badge" 
+                                  th:classappend="${q.type == 'MCQ' ? 'badge-mcq' : (q.type == 'MSQ' ? 'badge-msq' : 'badge-nat')}"
+                                  th:text="${'Q' + q.sequenceNo + ' | ' + q.type}">Q1 | MCQ</span>
+                            <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary);"
+                                  th:text="${q.marks + ' Marks | -' + q.negativeMarks + ' Neg.'}">1 Marks | -0.33 Neg.</span>
+                        </div>
+
+                        <p style="font-size: 1rem; line-height: 1.6; color: var(--text-primary); font-weight: 600;" 
+                           th:text="${q.questionText}">Question content...</p>
+
+                        <!-- Options for MCQ/MSQ -->
+                        <div class="opt-list" th:if="${q.options != null && !#lists.isEmpty(q.options)}">
+                            <div class="opt-item" 
+                                 th:each="o : ${q.options}"
+                                 th:classappend="${o.isCorrect ? 'opt-correct' : ''}">
+                                <span class="opt-icon" th:text="${o.label}">A</span>
+                                <span th:text="${o.text}" style="color: var(--text-primary);">Option Text</span>
+                            </div>
+                        </div>
+
+                        <!-- NAT correct values -->
+                        <div style="background-color: rgba(245, 158, 11, 0.05); border: 1px dashed rgba(245, 158, 11, 0.3); border-radius: 8px; padding: 0.75rem 1rem; margin-top: 1rem;"
+                             th:if="${q.type == 'NAT'}">
+                            <span style="font-size: 0.8rem; font-weight: 700; color: #f59e0b; text-transform: uppercase;">Official NAT Value Range</span>
+                            <div style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary); margin-top: 0.25rem;"
+                                 th:text="${q.correctNatValue + ' (Tolerance: ±' + q.natTolerance + ')'}">42 (Tolerance: 0.0)</div>
+                        </div>
+
+                        <div style="background-color: var(--card-bg-light); border-left: 3px solid var(--accent); padding: 0.75rem 1rem; font-size: 0.85rem; color: var(--text-secondary); margin-top: 1rem; border-radius: 0 6px 6px 0;">
+                            <strong>Detailed derivation:</strong> <span th:text="${q.explanation}">Explanation...</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Summary & Confirmation Form -->
+            <div class="card" style="position: sticky; top: 2rem;">
+                <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.25rem;">
+                    <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-primary);">Ingestion Summary</h3>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 0.75rem; font-size: 0.9rem; margin-bottom: 1.5rem;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Subject Area:</span>
+                        <strong th:text="${draft.subject}" style="color: var(--text-primary);">Subject</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Topic / Category:</span>
+                        <strong th:text="${draft.topic}" style="color: var(--text-primary);">Topic</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Total Questions:</span>
+                        <strong th:text="${#lists.size(draft.questions)}" style="color: var(--text-primary);">0</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-secondary);">Test Duration:</span>
+                        <strong th:text="${draft.durationMinutes + ' Minutes'}" style="color: var(--text-primary);">180 Min</strong>
+                    </div>
+                </div>
+
+                <form th:action="@{/admin/rag/confirm}" method="post">
+                    <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem; font-size: 1rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Confirm & Ingest to PGVector
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

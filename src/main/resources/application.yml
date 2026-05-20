@@ -2,21 +2,20 @@ spring:
   application:
     name: gate-mock-exam
   ai:
-    google:
-      genai:
-        api-key: ${GEMINI_API_KEY}          # set in env or .env file
-        project-id: gate-mock-exam-project  # required placeholder in Spring AI 1.1.1
-        location: us-central1
-        embedding:
-          api-key: ${GEMINI_API_KEY}
-          project-id: gate-mock-exam-project
-          location: us-central1
-          text:
-            options:
-              model: gemini-embedding-001          # Google's developer embedding model
-        chat:
-          options:
-            model: gemini-2.0-flash            # wired in Phase 3
+    ollama:
+      base-url: http://localhost:11434
+      chat:
+        options:
+          model: qwen2.5-coder:7b
+      embedding:
+        options:
+          model: nomic-embed-text
+    vectorstore:
+      pgvector:
+        dimension: 768
+        distance-type: COSINE_DISTANCE
+        table-name: gate_vector_store
+        initialize-schema: true
   datasource:
     url: jdbc:postgresql://localhost:5439/gate_db
     username: gate_user

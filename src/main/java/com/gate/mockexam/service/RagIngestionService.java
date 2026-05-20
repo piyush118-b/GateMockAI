@@ -7,12 +7,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.vectorstore.SearchRequest;
-import org.springframework.ai.vectorstore.SimpleVectorStore;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -23,18 +22,18 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RagIngestionService {
 
-    private final SimpleVectorStore vectorStore;
+    private final VectorStore vectorStore;
     private final ObjectMapper objectMapper;
 
-    @Value("${gate.rag.vector-store-path}")
-    private String vectorStorePath;
+    @Value("${gate.rag.seed-questions-path}")
+    private String seedQuestionsPath;
 
     @Value("${gate.rag.seed-questions-path}")
     private Resource seedQuestionsResource;
 
     /**
      * Loads seed questions from JSON, converts each to a Spring AI Document,
-     * adds to the vector store in batches of 10 to avoid OOM or timeouts, then persists to disk.
+     * adds to the vector store in batches of 10.
      */
     public int ingestSeedQuestions() throws IOException {
         log.info("Loading seed questions from resource: {}", seedQuestionsResource.getFilename());
@@ -61,7 +60,7 @@ public class RagIngestionService {
             return new Document(content, metadata);
         }).toList();
 
-        // Batch in groups of 10 to prevent OOM/timeouts during Gemini API calls
+        // Batch in groups of 10 to prevent OOM/timeouts during local Ollama model processing
         int batchSize = 10;
         int totalIngested = 0;
         for (int i = 0; i < documents.size(); i += batchSize) {
@@ -71,16 +70,21 @@ public class RagIngestionService {
             log.info("Successfully embedded and added batch: {} to {} / Total: {}", i, i + batch.size(), documents.size());
         }
 
-        // Save the updated store to disk
-        File saveFile = new File(vectorStorePath);
-        File parentDir = saveFile.getParentFile();
-        if (parentDir != null && !parentDir.exists()) {
-            parentDir.mkdirs();
-        }
-        vectorStore.save(saveFile);
-        log.info("Successfully persisted vector store to disk: {}", vectorStorePath);
-
+        log.info("Successfully persisted vector store elements directly into PGVector store.");
         return totalIngested;
+    }
+
+    /**
+     * Ingestion support for dynamic document chunking (used in past paper uploading)
+     */
+    public void ingestDocumentChunks(List<Document> chunks) {
+        log.info("Ingesting {} dynamic document chunks into PGVector store", chunks.size());
+        int batchSize = 10;
+        for (int i = 0; i < chunks.size(); i += batchSize) {
+            List<Document> batch = chunks.subList(i, Math.min(i + batchSize, chunks.size()));
+            vectorStore.add(batch);
+            log.info("Added batch of dynamic chunks: {} to {} / Total: {}", i, i + batch.size(), chunks.size());
+        }
     }
 
     /**
@@ -97,11 +101,11 @@ public class RagIngestionService {
     }
 
     /**
-     * Returns count of embedded docs by searching with a wildcard/common exam query.
+     * Returns count of embedded docs in PGVector.
      */
     public int getVectorCount() {
         try {
-            // SimpleVectorStore doesn't expose count directly; track via metadata
+            // Similarity search with wildcard to count elements up to 1000
             return vectorStore.similaritySearch(
                 SearchRequest.builder().query("GATE exam").topK(1000).build()
             ).size();

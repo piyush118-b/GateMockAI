@@ -1,0 +1,168 @@
+package com.gate.mockexam.service;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gate.mockexam.dto.*;
+import com.gate.mockexam.entity.MockTest;
+import com.gate.mockexam.entity.Question;
+import com.gate.mockexam.entity.Option;
+import com.gate.mockexam.enums.QuestionType;
+import com.gate.mockexam.repository.MockTestRepository;
+import com.gate.mockexam.repository.QuestionRepository;
+import com.gate.mockexam.repository.OptionRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.document.Document;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.io.IOException;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+public class MockTestGenerationService {
+
+    private final ChatClient chatClient;
+    private final RagIngestionService ragIngestionService;
+    private final ObjectMapper objectMapper;
+    private final MockTestRepository mockTestRepository;
+    private final QuestionRepository questionRepository;
+    private final OptionRepository optionRepository;
+
+    @Value("classpath:prompts/generate_mock_test.st")
+    private Resource promptTemplate;
+
+    @jakarta.annotation.PostConstruct
+    public void init() {
+        objectMapper.configure(com.fasterxml.jackson.core.json.JsonReadFeature.ALLOW_UNESCAPED_CONTROL_CHARS.mappedFeature(), true);
+    }
+
+    public MockTest generateAndSaveTest(MockTestGenerationRequestDto request) {
+        // Enforce limits to control Gemini API costs
+        int totalRequested = request.getMcqCount() + request.getMsqCount() + request.getNatCount();
+        if (totalRequested > 15) {
+            throw new IllegalArgumentException("Cannot generate more than 15 total questions per test to control API costs.");
+        }
+
+        java.time.LocalDateTime oneHourAgo = java.time.LocalDateTime.now().minusHours(1);
+        long recentGenerations = mockTestRepository.countByCreatedAtAfter(oneHourAgo);
+        if (recentGenerations >= 5) {
+            throw new IllegalStateException("AI Generation limit exceeded (Max 5 tests per hour to control API costs). Please try again later.");
+        }
+
+        // Step 1: RAG retrieval — get top 5 similar past questions as context
+        List<Document> contextDocs = ragIngestionService.retrieveSimilarQuestions(
+            request.getTopic() + " " + request.getSubject(), 5
+        );
+
+        String contextQuestions = IntStream.range(0, contextDocs.size())
+            .mapToObj(i -> (i + 1) + ". " + contextDocs.get(i).getText())
+            .collect(Collectors.joining("\n\n"));
+
+        // Step 2: Build and send prompt to Gemini with manual template placeholder replacements
+        String renderedPrompt = loadTemplate()
+            .replace("{contextCount}", String.valueOf(contextDocs.size()))
+            .replace("{contextQuestions}", contextQuestions)
+            .replace("{topic}", request.getTopic())
+            .replace("{subject}", request.getSubject())
+            .replace("{mcqCount}", String.valueOf(request.getMcqCount()))
+            .replace("{msqCount}", String.valueOf(request.getMsqCount()))
+            .replace("{natCount}", String.valueOf(request.getNatCount()));
+
+        String rawJson = chatClient.prompt()
+            .user(renderedPrompt)
+            .call()
+            .content();
+
+        log.debug("Raw Gemini response: {}", rawJson);
+
+        // Step 3: Parse JSON → DTOs
+        AiGeneratedTestDto dto = parseResponse(rawJson);
+
+        // Step 4: Map DTOs → JPA entities and persist
+        return persistTest(dto);
+    }
+
+    private AiGeneratedTestDto parseResponse(String rawJson) {
+        // Strip potential markdown fences if Gemini adds them despite instructions
+        String cleaned = rawJson.trim()
+            .replaceAll("^```json\\s*", "")
+            .replaceAll("^```\\s*", "")
+            .replaceAll("```$", "")
+            .trim();
+        try {
+            return objectMapper.readValue(cleaned, AiGeneratedTestDto.class);
+        } catch (JsonProcessingException e) {
+            log.error("Failed to parse Gemini JSON response: {}", cleaned, e);
+            throw new RuntimeException("AI returned invalid JSON. Please retry.", e);
+        }
+    }
+
+    @Transactional
+    public MockTest persistTest(AiGeneratedTestDto dto) {
+        MockTest test = MockTest.builder()
+            .title(dto.getTitle())
+            .topic(dto.getTopic())
+            .subject(dto.getSubject())
+            .durationMinutes(dto.getDurationMinutes())
+            .isPublished(false)
+            .build();
+
+        // Compute total marks
+        BigDecimal totalMarks = dto.getQuestions().stream()
+            .map(q -> BigDecimal.valueOf(q.getMarks()))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        test.setTotalMarks(totalMarks);
+
+        test = mockTestRepository.save(test);
+
+        for (AiGeneratedQuestionDto qDto : dto.getQuestions()) {
+            Question question = Question.builder()
+                .test(test)
+                .questionText(qDto.getQuestionText())
+                .type(QuestionType.valueOf(qDto.getType()))
+                .marks(BigDecimal.valueOf(qDto.getMarks()))
+                .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
+                .correctNatValue(qDto.getCorrectNatValue())
+                .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
+                .sequenceNo(qDto.getSequenceNo())
+                .explanation(qDto.getExplanation())
+                .build();
+
+            question = questionRepository.save(question);
+
+            if (qDto.getOptions() != null) {
+                for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
+                    Option opt = Option.builder()
+                        .question(question)
+                        .optionLabel(oDto.getLabel().charAt(0))
+                        .optionText(oDto.getText())
+                        .isCorrect(oDto.isCorrect())
+                        .build();
+                    opt = optionRepository.save(opt);
+                    question.getOptions().add(opt);
+                }
+            }
+            test.getQuestions().add(question);
+        }
+
+        return test;
+    }
+
+    private String loadTemplate() {
+        try {
+            return new String(promptTemplate.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new RuntimeException("Could not load prompt template", e);
+        }
+    }
+}

@@ -9,4 +9,5 @@ import java.util.UUID;
 @Repository
 public interface MockTestRepository extends JpaRepository<MockTest, UUID> {
     List<MockTest> findByIsPublished(boolean isPublished);
+    long countByCreatedAtAfter(java.time.LocalDateTime dateTime);
 }

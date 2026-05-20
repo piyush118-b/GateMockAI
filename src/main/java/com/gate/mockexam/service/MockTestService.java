@@ -33,6 +33,14 @@ public class MockTestService {
         return mockTestRepository.findById(id).orElse(null);
     }
 
+    @org.springframework.transaction.annotation.Transactional
+    public void publishTest(UUID id) {
+        MockTest test = mockTestRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Test not found: " + id));
+        test.setPublished(true);
+        mockTestRepository.save(test);
+    }
+
     private MockTestSummaryDto mapToSummary(MockTest test) {
         return MockTestSummaryDto.builder()
                 .id(test.getId())

@@ -3,61 +3,197 @@
       th:replace="~{layout/base :: layout(~{::content})}">
 <head>
     <title>AI Exam Generator | GATE MockAI</title>
+    <!-- Add special styling for loading state and cards in this template -->
+    <style th:inline="css">
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .ai-spinner {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(99, 102, 241, 0.15);
+            border-top: 4px solid var(--primary);
+            border-right: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .ai-loading-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .ai-loading-subtext {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+        .input-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+        }
+    </style>
 </head>
 <body>
     <div th:fragment="content">
-        <div style="margin-bottom: 2rem;">
-            <h2>AI-Powered GATE Exam Generator</h2>
-            <p style="color: var(--text-secondary);">Leverage Google Gemini Pro to dynamically draft complete, syllabus-aligned GATE Mock Tests.</p>
+        <!-- RAG Generation Loading Screen Overlay -->
+        <div id="aiLoadingOverlay" class="loading-overlay">
+            <div class="ai-spinner"></div>
+            <div class="ai-loading-text">Gemini AI Generating Questions...</div>
+            <div class="ai-loading-subtext" id="aiLoadingMessage">Running similarity search on local RAG seeds, generating technical MCQ/MSQ/NAT papers, and rendering conceptual explanations. Please wait ~15 seconds.</div>
         </div>
 
-        <div class="card" style="max-width: 650px; margin: 0 auto;">
-            <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.5rem;">
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                <h3 style="font-size: 1.35rem;">Configure Generator Settings</h3>
+        <div style="margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem;">
+            <a th:href="@{/admin/dashboard}" style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.9rem; font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="dashboard-hero">
+            <h1>AI Mock Test Generator</h1>
+            <p>Leverage Google Gemini 2.0 Flash to synthesize custom, GATE-caliber questions seeded with authentic past paper concepts retrieved from the vector store.</p>
+        </div>
+
+        <!-- Success/Error Alerts -->
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <div class="card" style="max-width: 750px; margin: 0 auto;">
+            <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 1rem; margin-bottom: 2rem;">
+                <h2 style="font-size: 1.4rem; font-weight: 700; color: var(--text-primary);">Configure Exam Template</h2>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">Set target topic parameters to seed the semantic context engine.</p>
             </div>
-            
-            <form onsubmit="event.preventDefault(); alert('AI Exam Generation is a Phase 3 feature. Database, security, and Thymeleaf scaffolds are now fully operational!');">
+
+            <form th:action="@{/admin/tests/generate}" th:object="${request}" method="post" id="generatorForm">
+                <!-- Subject selection -->
                 <div class="form-group">
-                    <label class="form-label" for="subject">GATE Subject</label>
-                    <select class="form-control" id="subject">
-                        <option value="CS">Computer Science & Information Technology (CS)</option>
-                        <option value="EC">Electronics & Communication (EC)</option>
-                        <option value="EE">Electrical Engineering (EE)</option>
-                        <option value="ME">Mechanical Engineering (ME)</option>
+                    <label class="form-label" for="subject">Subject Area</label>
+                    <select id="subject" th:field="*{subject}" class="form-control">
+                        <option value="">-- Choose Subject --</option>
+                        <option th:each="sub : ${subjects}" th:value="${sub}" th:text="${sub}"></option>
                     </select>
+                    <div class="form-error" th:if="${#fields.hasErrors('subject')}" th:errors="*{subject}"></div>
                 </div>
 
+                <!-- Topic field -->
                 <div class="form-group">
-                    <label class="form-label" for="topic">Topic Coverage</label>
-                    <input type="text" class="form-control" id="topic" placeholder="e.g. Memory Management, CPU Scheduling, Virtual Memory" required>
+                    <label class="form-label" for="topic">Target Topic</label>
+                    <input type="text" id="topic" th:field="*{topic}" class="form-control" placeholder="e.g., CPU Scheduling, Relational Algebra, IP Subnetting, CFG Ambiguity" />
+                    <div class="form-error" th:if="${#fields.hasErrors('topic')}" th:errors="*{topic}"></div>
                 </div>
 
-                <div class="grid-cols-2" style="gap: 1rem; margin-bottom: 1.5rem;">
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="questionCount">Total Questions</label>
-                        <input type="number" class="form-control" id="questionCount" value="10" min="5" max="65" required>
+                <!-- Question Count Spinners -->
+                <div class="input-row" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="mcqCount">MCQ Count (1 - 20)</label>
+                        <input type="number" id="mcqCount" th:field="*{mcqCount}" min="1" max="20" class="form-control" />
+                        <div class="form-error" th:if="${#fields.hasErrors('mcqCount')}" th:errors="*{mcqCount}"></div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 0;">
-                        <label class="form-label" for="duration">Duration (Minutes)</label>
-                        <input type="number" class="form-control" id="duration" value="30" min="15" max="180" required>
+                    <div class="form-group">
+                        <label class="form-label" for="msqCount">MSQ Count (0 - 10)</label>
+                        <input type="number" id="msqCount" th:field="*{msqCount}" min="0" max="10" class="form-control" />
+                        <div class="form-error" th:if="${#fields.hasErrors('msqCount')}" th:errors="*{msqCount}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="natCount">NAT Count (0 - 10)</label>
+                        <input type="number" id="natCount" th:field="*{natCount}" min="0" max="10" class="form-control" />
+                        <div class="form-error" th:if="${#fields.hasErrors('natCount')}" th:errors="*{natCount}"></div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="difficulty">Cognitive Target (GATE levels)</label>
-                    <select class="form-control" id="difficulty">
-                        <option value="balanced">Balanced (1-mark easy, 2-mark high-order analytical)</option>
-                        <option value="analytical">Highly Analytical (Focus on MSQ & NAT)</option>
-                        <option value="recall">Recall & Application</option>
-                    </select>
+                <div style="margin-top: 2rem; border-top: 1px solid var(--border-color); padding-top: 1.5rem;">
+                    <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem; font-size: 1rem;">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        Generate Mock Test with Gemini AI
+                    </button>
                 </div>
-
-                <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1rem;">
-                    Generate Syllabus-Aligned Test
-                </button>
             </form>
         </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const form = document.getElementById('generatorForm');
+                const overlay = document.getElementById('aiLoadingOverlay');
+                const msg = document.getElementById('aiLoadingMessage');
+                
+                const messages = [
+                    "Querying local SimpleVectorStore for top technical seeds...",
+                    "Context retrieved. Injecting prompt into Gemini templates...",
+                    "Contacting Gemini chat model (gemini-2.5-flash)...",
+                    "Synthesizing mathematically rigorous MCQs, MSQs, and NATs...",
+                    "Generating structural explanations and grading boundaries...",
+                    "Parsing strict JSON schema response on local server...",
+                    "Saving test entities and options to PostgreSQL tables..."
+                ];
+                
+                let isSubmitting = false;
+                form.addEventListener('submit', function(e) {
+                    if (isSubmitting) return;
+
+                    // Check fields validity before triggering overlay
+                    const subjectVal = document.getElementById('subject').value;
+                    const topicVal = document.getElementById('topic').value.trim();
+                    if (!subjectVal || !topicVal) {
+                        return; // Let standard Spring validation highlight empty inputs
+                    }
+
+                    e.preventDefault();
+                    isSubmitting = true;
+
+                    // Show overlay immediately
+                    overlay.classList.add('active');
+                    
+                    let step = 0;
+                    const interval = setInterval(() => {
+                        if (step < messages.length) {
+                            msg.textContent = messages[step];
+                            step++;
+                        } else {
+                            msg.textContent = "Finalizing data commitment to tables... Almost done!";
+                            clearInterval(interval);
+                        }
+                    }, 2200);
+
+                    // Wait 150ms to guarantee browser repaints the DOM showing the loader
+                    setTimeout(() => {
+                        form.submit();
+                    }, 150);
+                });
+            });
+        </script>
     </div>
 </body>
 </html>

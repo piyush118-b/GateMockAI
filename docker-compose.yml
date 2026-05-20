@@ -1,7 +1,7 @@
 version: '3.8'
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: gate_postgres
     environment:
       POSTGRES_DB: gate_db
@@ -11,6 +11,15 @@ services:
       - "5439:5432"
     volumes:
       - gate_pgdata:/var/lib/postgresql/data
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: gate_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./ollama_data:/root/.ollama
+    restart: unless-stopped
 
 volumes:
   gate_pgdata:

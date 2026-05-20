@@ -5,3 +5,5 @@ target/
 ./data/vector-store.json
 /data/vector-store.json
 data/vector-store.json
+ollama_data/
+.env

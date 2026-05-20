@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title th:text="${test.title} + ' | GATE MockAI'">Test Details</title>
+    <!-- Add page-specific styles -->
+    <style th:inline="css">
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2.5rem;
+            padding-bottom: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+        .meta-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            margin-top: 1.5rem;
+        }
+        .meta-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: var(--shadow-sm);
+        }
+        .meta-val {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+        .meta-lbl {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+        .question-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+        .question-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        .options-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .option-item {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            transition: all 0.2s ease;
+        }
+        .option-item.correct {
+            background-color: rgba(16, 185, 129, 0.08);
+            border-color: var(--success);
+            color: var(--success);
+            font-weight: 600;
+        }
+        .option-label-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.85rem;
+            background-color: var(--border-color);
+            color: var(--text-secondary);
+        }
+        .option-item.correct .option-label-badge {
+            background-color: var(--success);
+            color: white;
+        }
+        .explanation-box {
+            background-color: rgba(99, 102, 241, 0.04);
+            border-left: 4px solid var(--primary);
+            border-radius: 4px 10px 10px 4px;
+            padding: 1.25rem;
+            margin-top: 1.5rem;
+            font-size: 0.925rem;
+        }
+        .explanation-title {
+            font-weight: 700;
+            color: var(--primary);
+            margin-bottom: 0.35rem;
+        }
+        .explanation-text {
+            color: var(--text-secondary);
+        }
+        .nat-box {
+            background-color: rgba(245, 158, 11, 0.08);
+            border: 1.5px dashed var(--warning);
+            border-radius: 10px;
+            padding: 1.25rem;
+            color: #d97706;
+            font-weight: 600;
+            font-size: 1rem;
+            margin-top: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div th:fragment="content">
+        <div style="margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center;">
+            <a th:href="@{/admin/tests}" style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.9rem; font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Back to Tests
+            </a>
+            
+            <div style="display: flex; gap: 1rem;">
+                <a th:href="@{/admin/tests/generate}" class="btn btn-secondary">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                    Regenerate Test
+                </a>
+            </div>
+        </div>
+
+        <!-- Success and Error Alerts -->
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <div class="detail-header">
+            <div>
+                <h1 style="font-size: 2.2rem; font-weight: 800; color: var(--text-primary);" th:text="${test.title}">GATE Mock Test Title</h1>
+                <div style="display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem;">
+                    <span class="badge badge-published" th:if="${test.published}">Published</span>
+                    <span class="badge badge-draft" th:unless="${test.published}">Draft</span>
+                    <span style="color: var(--text-muted);">•</span>
+                    <span style="color: var(--text-secondary); font-weight: 500;" th:text="${test.subject}">Subject Area</span>
+                </div>
+            </div>
+            
+            <!-- Conditional Publish Action Button -->
+            <form th:if="${!test.published}" th:action="@{/admin/tests/{id}/publish(id=${test.id})}" method="post">
+                <button type="submit" class="btn btn-primary" style="gap: 0.5rem;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                    Publish Test Paper
+                </button>
+            </form>
+        </div>
+
+        <!-- Metadata metrics card block -->
+        <div class="meta-grid">
+            <div class="meta-card">
+                <div class="meta-val" th:text="${test.topic}">Topic</div>
+                <div class="meta-lbl">Target Topic</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-val" th:text="${test.questions.size()}">0</div>
+                <div class="meta-lbl">Total Questions</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-val" th:text="${test.durationMinutes} + ' min'">0 min</div>
+                <div class="meta-lbl">Allowed Duration</div>
+            </div>
+            <div class="meta-card">
+                <div class="meta-val" th:text="${test.totalMarks}">0</div>
+                <div class="meta-lbl">Total Marks</div>
+            </div>
+        </div>
+
+        <div style="margin-top: 3.5rem;">
+            <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-primary); margin-bottom: 2rem;">Mock Test Questions</h2>
+            
+            <div th:each="q : ${test.questions}" class="question-card">
+                <div class="question-card-header">
+                    <div style="display: flex; align-items: center; gap: 0.75rem;">
+                        <span style="font-weight: 800; font-size: 1.25rem; color: var(--primary);" th:text="'Q' + ${q.sequenceNo}">Q1</span>
+                        <span th:class="'badge badge-' + ${#strings.toLowerCase(q.type)}" th:text="${q.type}">MCQ</span>
+                    </div>
+                    <div style="text-align: right; color: var(--text-secondary); font-size: 0.85rem; font-weight: 600;">
+                        <span th:text="${q.marks} + ' Mark(s)'">1 Mark</span>
+                        <span th:if="${q.negativeMarks.doubleValue() > 0}" th:text="' (Negative: -' + ${q.negativeMarks} + ')'" style="color: var(--danger);">(-0.33)</span>
+                    </div>
+                </div>
+
+                <!-- Question Text -->
+                <div style="font-size: 1.1rem; color: var(--text-primary); font-weight: 500; white-space: pre-wrap; margin-bottom: 1.5rem;" th:text="${q.questionText}">Question text goes here...</div>
+
+                <!-- Rendering options for MCQs & MSQs -->
+                <div class="options-list" th:if="${q.type.name() == 'MCQ' || q.type.name() == 'MSQ'}">
+                    <div th:each="opt : ${q.options}" th:class="'option-item ' + (${opt.isCorrect} ? 'correct' : '')">
+                        <div class="option-label-badge" th:text="${opt.optionLabel}">A</div>
+                        <div th:text="${opt.optionText}">Option text</div>
+                    </div>
+                </div>
+
+                <!-- Rendering correct details for NAT -->
+                <div class="nat-box" th:if="${q.type.name() == 'NAT'}">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    <span>
+                        Correct Answer Value: 
+                        <strong th:text="${q.correctNatValue}">42.0</strong> 
+                        (Acceptable Tolerance: 
+                        <strong th:text="'±' + ${q.natTolerance}">±0.0</strong>)
+                    </span>
+                </div>
+
+                <!-- Detailed conceptual analytical explanations -->
+                <div class="explanation-box" th:if="${q.explanation != null && !q.explanation.isEmpty()}">
+                    <div class="explanation-title">Conceptual Explanation</div>
+                    <div class="explanation-text" th:text="${q.explanation}">Detailed derivation and step-by-step logic...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

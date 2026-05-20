@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title>RAG past paper Ingest | GATE MockAI</title>
+    <style th:inline="css">
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(11, 15, 25, 0.85);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #ffffff;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        .loading-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .ai-spinner {
+            width: 80px;
+            height: 80px;
+            border: 4px solid rgba(99, 102, 241, 0.15);
+            border-top: 4px solid var(--primary);
+            border-right: 4px solid var(--accent);
+            border-radius: 50%;
+            animation: spin 1.5s cubic-bezier(0.68, -0.55, 0.27, 1.55) infinite;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 30px rgba(99, 102, 241, 0.4);
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .ai-loading-text {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: var(--gradient-primary);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            text-align: center;
+        }
+        .grid-two {
+            display: grid;
+            grid-template-columns: 1.2fr 1fr;
+            gap: 2rem;
+            align-items: start;
+        }
+        @media(max-width: 900px) {
+            .grid-two {
+                grid-template-columns: 1fr;
+            }
+        }
+        .tester-results {
+            margin-top: 1.5rem;
+            max-height: 450px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+        .result-card {
+            background-color: var(--card-bg-light);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            font-size: 0.9rem;
+            line-height: 1.5;
+        }
+        .result-meta {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 0.25rem;
+            display: flex;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div th:fragment="content">
+        <!-- Loader Screen Overlay -->
+        <div id="aiLoadingOverlay" class="loading-overlay">
+            <div class="ai-spinner"></div>
+            <div class="ai-loading-text" id="loadingText">Extracting PDF and Aligining answer keys...</div>
+            <div style="color: var(--text-secondary); max-width: 400px; text-align: center; font-size: 0.95rem;" id="loadingSubText">Executing local Qwen PDFBox parsing engine. Chunking document layouts, indexing structure blocks, and pairing with answer keys. Please wait ~15s.</div>
+        </div>
+
+        <div style="margin-bottom: 2rem; display: flex; align-items: center; gap: 0.5rem;">
+            <a th:href="@{/admin/dashboard}" style="color: var(--text-secondary); text-decoration: none; display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.9rem; font-weight: 600;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                Back to Dashboard
+            </a>
+        </div>
+
+        <div class="dashboard-hero">
+            <h1>RAG Document Ingestion & PGVector</h1>
+            <p>Upload official GATE syllabus guides, past exam papers, and align them side-by-side with official answer keys. High-fidelity parsed question text blocks are stored persistently in **Postgres PGVector**.</p>
+        </div>
+
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+        <!-- Ingestion Status Panel -->
+        <div class="grid-two">
+            <!-- Upload Panel -->
+            <div class="card">
+                <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">Ingest Question Paper & Key</h2>
+                    <span class="status-pill status-active" th:text="${vectorCount + ' Context Vectors'}">0 Vectors</span>
+                </div>
+
+                <form th:action="@{/admin/rag/upload}" method="post" enctype="multipart/form-data" id="ragForm">
+                    <div class="form-group">
+                        <label class="form-label" for="file">GATE Paper File (.pdf, .txt)</label>
+                        <input type="file" id="file" name="file" class="form-control" accept=".pdf,.txt" required />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div class="form-group">
+                            <label class="form-label" for="subject">Subject</label>
+                            <input type="text" id="subject" name="subject" class="form-control" placeholder="e.g., Operating Systems" required />
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label" for="topic">Topic / Exam Name</label>
+                            <input type="text" id="topic" name="topic" class="form-control" placeholder="e.g., CPU Scheduling" required />
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="answerKeyText">Official Answer Key Entry (Optional but Recommended)</label>
+                        <p style="font-size: 0.8rem; color: var(--text-secondary); margin-top: -0.25rem; margin-bottom: 0.5rem;">Format as 'question_number: value' (one entry per line):</p>
+                        <textarea id="answerKeyText" name="answerKeyText" rows="6" class="form-control" style="font-family: monospace;" placeholder="1: B&#10;2: A, C&#10;3: 15.5&#10;4: D"></textarea>
+                    </div>
+
+                    <div style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1.25rem;">
+                        <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem;">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            Parse Paper with Local Ollama AI
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- RAG Search tester -->
+            <div class="card">
+                <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; margin-bottom: 1.5rem;">
+                    <h2 style="font-size: 1.25rem; font-weight: 700; color: var(--text-primary);">PGVector Similarity Search Playground</h2>
+                    <p style="font-size: 0.85rem; color: var(--text-secondary);">Query your persistent vector store directly to see exact content chunk extractions.</p>
+                </div>
+
+                <div style="display: flex; gap: 0.75rem;">
+                    <input type="text" id="queryInput" class="form-control" placeholder="Search e.g. Virtual Memory, SUB IP..." style="flex: 1;" />
+                    <button type="button" class="btn btn-accent" id="searchBtn" style="padding: 0 1.25rem;">Search</button>
+                </div>
+
+                <div class="tester-results" id="searchResults">
+                    <div style="text-align: center; color: var(--text-secondary); margin: 3rem 0; font-size: 0.9rem;">
+                        Type a query above and hit search to verify retrieval from the local Postgres PGVector table.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                const form = document.getElementById('ragForm');
+                const overlay = document.getElementById('aiLoadingOverlay');
+                const loadingText = document.getElementById('loadingText');
+                const loadingSubText = document.getElementById('loadingSubText');
+
+                const steps = [
+                    "Reading raw text blocks using Apache PDFBox...",
+                    "Analyzing layouts and isolating individual question elements...",
+                    "Extracting and aligning options with the Answer Key Map...",
+                    "Generating comprehensive explanations with Qwen 2.5 Coder...",
+                    "Synthesizing MSQ and NAT structures... Almost complete!"
+                ];
+
+                form.addEventListener('submit', function(e) {
+                    overlay.classList.add('active');
+                    let i = 0;
+                    const interval = setInterval(() => {
+                        if (i < steps.length) {
+                            loadingText.textContent = steps[i];
+                            i++;
+                        } else {
+                            clearInterval(interval);
+                        }
+                    }, 2500);
+                });
+
+                // Similarity Search Playground
+                const searchBtn = document.getElementById('searchBtn');
+                const queryInput = document.getElementById('queryInput');
+                const searchResults = document.getElementById('searchResults');
+
+                searchBtn.addEventListener('click', function() {
+                    const query = queryInput.value.trim();
+                    if (!query) return;
+
+                    searchBtn.disabled = true;
+                    searchBtn.textContent = "Searching...";
+                    searchResults.innerHTML = '<div style="text-align: center; margin: 3rem 0;"><div class="ai-spinner" style="width: 40px; height: 40px; margin: 0 auto;"></div></div>';
+
+                    fetch('/admin/rag/test?query=' + encodeURIComponent(query) + '&topK=3', {
+                        method: 'POST'
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        searchBtn.disabled = false;
+                        searchBtn.textContent = "Search";
+                        
+                        if (data.length === 0) {
+                            searchResults.innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 2rem;">No matching vector embeddings found. Try uploading a past paper!</div>';
+                            return;
+                        }
+
+                        let html = '';
+                        data.forEach((item, index) => {
+                            const subject = item.metadata.subject || 'Unknown';
+                            const topic = item.metadata.topic || 'General';
+                            const score = item.metadata.distance ? (1 - parseFloat(item.metadata.distance)).toFixed(4) : 'N/A';
+                            
+                            html += `
+                                <div class="result-card">
+                                    <div class="result-meta">
+                                        <span>Rank ${index + 1} | Subject: ${subject} | Topic: ${topic}</span>
+                                        <span style="color: var(--accent);">Match Score: ${score}</span>
+                                    </div>
+                                    <pre style="white-space: pre-wrap; font-family: inherit; margin: 0; color: var(--text-primary); font-size: 0.85rem;">${item.content}</pre>
+                                </div>
+                            `;
+                        });
+                        searchResults.innerHTML = html;
+                    })
+                    .catch(err => {
+                        searchBtn.disabled = false;
+                        searchBtn.textContent = "Search";
+                        searchResults.innerHTML = '<div class="alert alert-danger">Error fetching similarity results: ' + err.message + '</div>';
+                    });
+                });
+            });
+        </script>
+    </div>
+</body>
+</html>

@@ -43,6 +43,10 @@
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
                         Run AI Exam Generator (Phase 3)
                     </a>
+                    <a th:href="@{/admin/rag}" class="btn btn-accent" style="justify-content: flex-start;">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                        RAG Document Ingestion & PDF Parser
+                    </a>
                 </div>
             </div>
 
@@ -57,14 +61,19 @@
                     Embedded Seed Questions: <strong style="color: var(--primary);" th:text="${vectorCount}">0</strong>
                 </p>
                 <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 0.85rem; word-break: break-all;">
-                    Persistence Path: <code style="color: var(--accent); font-family: monospace;" th:text="${storePath}">./data/vector-store.json</code>
+                    Storage Target: <code style="color: var(--accent); font-family: monospace;">Postgres PGVector [gate_vector_store]</code>
                 </p>
-                <form th:action="@{/admin/rag/reingest}" method="post">
-                    <button type="submit" class="btn btn-primary btn-block" style="gap: 0.5rem;">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
-                        Force Re-ingest Seed Questions
-                    </button>
-                </form>
+                <div style="display: flex; gap: 1rem;">
+                    <form th:action="@{/admin/rag/reingest}" method="post" style="flex: 1;">
+                        <button type="submit" class="btn btn-secondary btn-block" style="gap: 0.5rem; font-size: 0.85rem;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+                            Re-ingest Seeds
+                        </button>
+                    </form>
+                    <a th:href="@{/admin/rag}" class="btn btn-primary" style="flex: 1; font-size: 0.85rem; text-decoration: none; display: flex; align-items: center; justify-content: center;">
+                        Manage PGVector Store
+                    </a>
+                </div>
             </div>
         </div>
 
