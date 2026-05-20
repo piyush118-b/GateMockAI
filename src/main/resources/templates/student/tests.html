@@ -37,7 +37,7 @@
                         </div>
                     </div>
                 </div>
-                <a href="#" class="btn btn-primary btn-block" onclick="alert('Exam launch logic is wired in Phase 2!')">
+                <a th:href="@{/student/tests/{id}/take(id=${test.id})}" class="btn btn-primary btn-block">
                     Launch Test
                 </a>
             </div>

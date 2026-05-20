@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title th:text="'Mock Exam Scorecard: ' + ${test.title}">Scorecard</title>
+    <style>
+        .result-hero {
+            background: linear-gradient(135deg, #1e1b4b 0%, #311042 100%);
+            color: white;
+            border-radius: 24px;
+            padding: 3.5rem;
+            text-align: center;
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 2.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-hero h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fdfbf7 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .metric-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            position: relative;
+        }
+
+        .metric-val {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-label {
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .question-review-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.2s;
+        }
+
+        .question-review-card.correct-attempt {
+            border-left: 5px solid var(--success);
+        }
+
+        .question-review-card.incorrect-attempt {
+            border-left: 5px solid var(--danger);
+        }
+
+        .question-review-card.skipped-attempt {
+            border-left: 5px solid var(--text-muted);
+        }
+
+        .attempt-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 700;
+            font-size: 0.875rem;
+            padding: 0.35rem 0.85rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+
+        .indicator-correct { background-color: rgba(16, 185, 129, 0.12); color: var(--success); }
+        .indicator-incorrect { background-color: rgba(239, 68, 68, 0.12); color: var(--danger); }
+        .indicator-skipped { background-color: rgba(148, 163, 184, 0.12); color: var(--text-secondary); }
+
+        .review-option {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 0.75rem;
+            font-size: 0.95rem;
+        }
+
+        .review-option.correct-option {
+            border-color: var(--success);
+            background-color: rgba(16, 185, 129, 0.04);
+            font-weight: 500;
+        }
+
+        .review-option.selected-wrong-option {
+            border-color: var(--danger);
+            background-color: rgba(239, 68, 68, 0.04);
+        }
+
+        .explanation-box {
+            background-color: rgba(79, 70, 229, 0.04);
+            border: 1px solid rgba(79, 70, 229, 0.15);
+            border-radius: 14px;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .back-nav {
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .back-nav a {
+            color: var(--primary);
+            text-decoration: none;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: transform 0.2s;
+        }
+
+        .back-nav a:hover {
+            transform: translateX(-4px);
+        }
+    </style>
+</head>
+<body>
+    <div th:fragment="content">
+        
+        <!-- Back Navigation to Tests List -->
+        <div class="back-nav">
+            <a th:href="@{/student/tests}">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Back to Available Mock Exams
+            </a>
+        </div>
+
+        <!-- HERO SCOREBOARD SUMMARY -->
+        <div class="result-hero">
+            <div style="font-size: 0.85rem; font-weight: 700; text-transform: uppercase; color: var(--accent); letter-spacing: 0.1em; margin-bottom: 0.5rem;">Timed Mock Exam Completed</div>
+            <h1 th:text="${test.title}">GATE CS Mock Test</h1>
+            <p style="color: #cbd5e1; max-width: 600px; margin: 0.5rem auto 0 auto;">Your test submission has been graded according to official GATE evaluation criteria. Review your score breakdown below.</p>
+        </div>
+
+        <!-- STATS / METRICS CARDS GRID -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-val" th:text="${attempt.score}">78.50</div>
+                <div class="metric-label">Your Final Score</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-val" th:text="${accuracy} + '%'">84.2%</div>
+                <div class="metric-label">Accuracy Rate</div>
+            </div>
+            <div class="metric-card" style="display: flex; flex-direction: column; justify-content: center; gap: 0.5rem;">
+                <div style="display: flex; justify-content: space-around;">
+                    <div>
+                        <span class="badge badge-published" th:text="${correctCount}" style="font-size: 1rem; padding: 0.4rem 0.8rem;">12</span>
+                        <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 0.25rem;">Correct</div>
+                    </div>
+                    <div>
+                        <span class="badge badge-danger" th:text="${incorrectCount}" style="font-size: 1rem; padding: 0.4rem 0.8rem;">4</span>
+                        <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 0.25rem;">Wrong</div>
+                    </div>
+                    <div>
+                        <span class="badge badge-draft" th:text="${skippedCount}" style="font-size: 1rem; padding: 0.4rem 0.8rem;">2</span>
+                        <div style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; color: var(--text-secondary); margin-top: 0.25rem;">Skipped</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DETAILED QUESTIONS REVIEW LIST -->
+        <h2 style="font-weight: 800; margin-bottom: 1.5rem; font-size: 1.75rem;">Question-by-Question Evaluation</h2>
+        
+        <div th:each="q : ${questions}">
+            
+            <div th:with="ans=${answerMap.get(q.id)}" 
+                 th:class="'question-review-card ' + (${ans != null && ans.isCorrect != null} ? (${ans.isCorrect} ? 'correct-attempt' : 'incorrect-attempt') : 'skipped-attempt')">
+                
+                <!-- Attempt Status Indicator Header -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1rem;">
+                    <div>
+                        <!-- Correct Status Badge -->
+                        <div th:if="${ans != null && ans.isCorrect != null && ans.isCorrect}" class="attempt-indicator indicator-correct">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            Correct Attempt (+<span th:text="${ans.marksAwarded}">1.0</span> Marks)
+                        </div>
+                        <!-- Incorrect Status Badge -->
+                        <div th:if="${ans != null && ans.isCorrect != null && !ans.isCorrect}" class="attempt-indicator indicator-incorrect">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            Incorrect Attempt (<span th:text="${ans.marksAwarded}">-0.33</span> Marks)
+                        </div>
+                        <!-- Skipped Status Badge -->
+                        <div th:if="${ans == null || ans.isCorrect == null}" class="attempt-indicator indicator-skipped">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                            Unattempted (0.0 Marks)
+                        </div>
+                    </div>
+                    
+                    <!-- Subject Category Metadata Label Tags -->
+                    <div style="display: flex; gap: 0.5rem;">
+                        <span class="badge badge-published" th:text="${q.sequenceNo != 0 ? 'Q' + q.sequenceNo : 'Question'}">Q1</span>
+                        <span class="badge badge-mcq" th:text="${q.type.name()}">MCQ</span>
+                    </div>
+                </div>
+
+                <!-- Question Text -->
+                <div class="question-text" th:text="${q.questionText}" style="margin-bottom: 1.5rem; font-size: 1.1rem; line-height: 1.6;">Question Text</div>
+
+                <!-- MCQ Options Display -->
+                <div th:if="${q.type.name() == 'MCQ'}" class="option-container">
+                    <div th:each="opt : ${q.options}" 
+                         th:class="'review-option ' + (${opt.isCorrect} ? 'correct-option' : '') + (${ans != null && ans.selectedOptionIds == opt.id.toString() && !opt.isCorrect} ? 'selected-wrong-option' : '')">
+                        
+                        <div class="option-label-badge" th:text="${opt.optionLabel}">A</div>
+                        <div th:text="${opt.optionText}" style="flex: 1;">Option Text</div>
+                        
+                        <!-- Checkmark icons indicating status -->
+                        <span th:if="${opt.isCorrect}" style="color: var(--success); font-weight: 700;">[Correct Answer]</span>
+                        <span th:if="${ans != null && ans.selectedOptionIds == opt.id.toString() && !opt.isCorrect}" style="color: var(--danger); font-weight: 600;">[Your Incorrect Selection]</span>
+                        <span th:if="${ans != null && ans.selectedOptionIds == opt.id.toString() && opt.isCorrect}" style="color: var(--success); font-weight: 700;">[Your Correct Selection]</span>
+                    </div>
+                </div>
+
+                <!-- MSQ Options Display -->
+                <div th:if="${q.type.name() == 'MSQ'}" class="option-container">
+                    <div th:each="opt : ${q.options}" 
+                         th:class="'review-option ' + (${opt.isCorrect} ? 'correct-option' : '') + (${ans != null && ans.selectedOptionIds != null && ans.selectedOptionIds.contains(opt.id.toString()) && !opt.isCorrect} ? 'selected-wrong-option' : '')">
+                        
+                        <div class="option-label-badge" th:text="${opt.optionLabel}">A</div>
+                        <div th:text="${opt.optionText}" style="flex: 1;">Option Text</div>
+                        
+                        <span th:if="${opt.isCorrect}" style="color: var(--success); font-weight: 700;">[Correct Choice]</span>
+                        <span th:if="${ans != null && ans.selectedOptionIds != null && ans.selectedOptionIds.contains(opt.id.toString()) && !opt.isCorrect}" style="color: var(--danger); font-weight: 600;">[Your Selection]</span>
+                        <span th:if="${ans != null && ans.selectedOptionIds != null && ans.selectedOptionIds.contains(opt.id.toString()) && opt.isCorrect}" style="color: var(--success); font-weight: 700;">[Your Correct Selection]</span>
+                    </div>
+                </div>
+
+                <!-- NAT Value Entered Display -->
+                <div th:if="${q.type.name() == 'NAT'}" class="nat-input-wrapper" style="max-width: 100%; margin-bottom: 0;">
+                    <div style="font-size: 0.95rem; margin-bottom: 0.5rem;">
+                        <strong>Official Answer Key Value:</strong> 
+                        <span th:text="${q.correctNatValue} + ' (Tolerance: ±' + (${q.natTolerance != null ? q.natTolerance : '0.01'}) + ')'" style="color: var(--success); font-weight: 700;">42.0</span>
+                    </div>
+                    <div style="font-size: 0.95rem;">
+                        <strong>Your Entered Value:</strong> 
+                        <span th:text="${ans != null && ans.natValueEntered != null ? ans.natValueEntered : 'Not Entered'}" 
+                              th:style="${ans != null && ans.isCorrect != null && ans.isCorrect} ? 'color: var(--success); font-weight: 700;' : (${ans != null && ans.natValueEntered != null} ? 'color: var(--danger); font-weight: 700;' : 'color: var(--text-muted);')">Not Entered</span>
+                    </div>
+                </div>
+
+                <!-- Step-by-Step Explanation Derivation Box -->
+                <div class="explanation-box">
+                    <h5 style="font-weight: 700; color: var(--primary); margin-bottom: 0.5rem; font-size: 0.95rem; display: flex; align-items: center; gap: 0.25rem;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                        Detailed Conceptual Explanation & Derivation
+                    </h5>
+                    <p style="font-size: 0.9rem; color: var(--text-secondary); line-height: 1.6;" th:text="${q.explanation != null ? q.explanation : 'Official answer is derived strictly from the aligned GATE marking keys.'}">Explanation goes here</p>
+                </div>
+
+            </div>
+            
+        </div>
+
+    </div>
+</body>
+</html>

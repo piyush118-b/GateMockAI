@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title th:text="'Take Mock Exam: ' + ${test.title}">Take Mock Exam</title>
+    <style>
+        .exam-layout {
+            display: grid;
+            grid-template-columns: 3fr 1fr;
+            gap: 2rem;
+            margin-top: 1rem;
+            height: calc(100vh - 120px);
+            min-height: 500px;
+        }
+
+        .workspace-panel {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-md);
+            overflow-y: auto;
+        }
+
+        .control-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .timer-card {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            color: #ffffff;
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: var(--shadow-md);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .timer-display {
+            font-size: 2.25rem;
+            font-weight: 700;
+            font-family: monospace;
+            background: linear-gradient(135deg, #22d3ee 0%, #6366f1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-top: 0.5rem;
+        }
+
+        .timer-warning {
+            background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%);
+        }
+        .timer-warning .timer-display {
+            background: linear-gradient(135deg, #f87171 0%, #ef4444 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .palette-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+        }
+
+        .palette-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.5rem;
+            margin-top: 1rem;
+            max-height: 250px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+
+        .palette-btn {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            cursor: pointer;
+            background-color: var(--bg-base);
+            color: var(--text-secondary);
+            transition: all 0.2s ease;
+            position: relative;
+        }
+
+        /* Official GATE Palette colors */
+        .palette-not-visited {
+            background-color: #f1f5f9;
+            color: #64748b;
+        }
+        .palette-not-answered {
+            background-color: #f87171;
+            color: #ffffff;
+            border-color: #ef4444;
+        }
+        .palette-answered {
+            background-color: #34d399;
+            color: #ffffff;
+            border-color: #10b981;
+        }
+        .palette-marked {
+            background-color: #c084fc;
+            color: #ffffff;
+            border-color: #a855f7;
+        }
+        .palette-marked-answered::after {
+            content: '';
+            position: absolute;
+            bottom: 3px;
+            right: 3px;
+            width: 6px;
+            height: 6px;
+            background-color: #34d399;
+            border-radius: 50%;
+        }
+
+        .palette-active {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+            transform: scale(1.05);
+        }
+
+        .question-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .question-text {
+            font-size: 1.15rem;
+            font-weight: 500;
+            line-height: 1.7;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
+            white-space: pre-line;
+        }
+
+        .option-container {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .option-card {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1.25rem 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .option-card:hover {
+            border-color: var(--primary);
+            background-color: rgba(var(--primary-rgb), 0.02);
+        }
+
+        .option-card.selected {
+            border-color: var(--primary);
+            background-color: rgba(var(--primary-rgb), 0.06);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .option-card input[type="radio"],
+        .option-card input[type="checkbox"] {
+            width: 1.2rem;
+            height: 1.2rem;
+            accent-color: var(--primary);
+            cursor: pointer;
+        }
+
+        .option-label-badge {
+            font-weight: 700;
+            font-size: 0.9rem;
+            color: var(--primary);
+            background-color: rgba(var(--primary-rgb), 0.1);
+            width: 28px;
+            height: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 6px;
+        }
+
+        .nat-input-wrapper {
+            background-color: var(--bg-base);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            max-width: 400px;
+        }
+
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.5rem;
+            font-size: 0.75rem;
+            margin-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1rem;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-secondary);
+        }
+
+        .legend-color {
+            width: 14px;
+            height: 14px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+
+        .actions-row {
+            display: flex;
+            justify-content: space-between;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Premium Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(11, 15, 25, 0.7);
+            backdrop-filter: var(--glass-blur);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .modal-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: var(--shadow-lg);
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div th:fragment="content" style="max-width: 1300px; margin: 0 auto;">
+        
+        <!-- Standard Thymeleaf Form submitting all selected variables -->
+        <form id="examForm" th:action="@{/student/attempts/{id}/submit(id=${attempt.id})}" method="POST">
+            
+            <div class="exam-layout">
+                
+                <!-- LEFT PANEL: WORKSPACE -->
+                <div class="workspace-panel">
+                    
+                    <!-- Question Loop Wrapper -->
+                    <div id="questionsContainer">
+                        <div th:each="q, stat : ${questions}" 
+                             th:id="'qbox_' + ${stat.index}" 
+                             class="question-box" 
+                             style="display: none;">
+                            
+                            <!-- Question Header Meta -->
+                            <div class="question-meta">
+                                <div>
+                                    <span class="badge badge-published" th:text="'Question ' + ${q.sequenceNo}">Q1</span>
+                                    <span th:if="${q.type.name() == 'MCQ'}" class="badge badge-mcq">MCQ</span>
+                                    <span th:if="${q.type.name() == 'MSQ'}" class="badge badge-msq">MSQ</span>
+                                    <span th:if="${q.type.name() == 'NAT'}" class="badge badge-nat">NAT</span>
+                                </div>
+                                <div style="font-size: 0.9rem; color: var(--text-secondary);">
+                                    <span th:text="${q.marks} + ' Mark(s)'" style="font-weight: 600; color: var(--text-primary);">1 Mark</span>
+                                    <span th:if="${q.negativeMarks.doubleValue() > 0}" 
+                                          th:text="' | Negative: -' + ${q.negativeMarks}" 
+                                          style="color: var(--danger); font-weight: 500;"> | Negative: -0.33</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Question Text -->
+                            <div class="question-text" th:text="${q.questionText}">What is correct?</div>
+                            
+                            <!-- MCQ Options -->
+                            <div th:if="${q.type.name() == 'MCQ'}" class="option-container">
+                                <div th:each="opt : ${q.options}" 
+                                     th:class="'option-card option_' + ${q.id}" 
+                                     th:onclick="'selectMcqOption(this, \'' + ${q.id} + '\', \'' + ${opt.id} + '\')'">
+                                    <input type="radio" 
+                                           th:name="'answer_mcq_' + ${q.id}" 
+                                           th:value="${opt.id}" 
+                                           th:id="'opt_' + ${opt.id}" 
+                                           style="display: none;" />
+                                    <div class="option-label-badge" th:text="${opt.optionLabel}">A</div>
+                                    <div th:text="${opt.optionText}">Option text</div>
+                                </div>
+                            </div>
+                            
+                            <!-- MSQ Options -->
+                            <div th:if="${q.type.name() == 'MSQ'}" class="option-container">
+                                <div th:each="opt : ${q.options}" 
+                                     th:class="'option-card option_' + ${q.id}" 
+                                     th:onclick="'toggleMsqOption(this, \'' + ${opt.id} + '\')'">
+                                    <input type="checkbox" 
+                                           th:name="'answer_msq_' + ${q.id}" 
+                                           th:value="${opt.id}" 
+                                           th:id="'opt_' + ${opt.id}" 
+                                           style="display: none;" />
+                                    <div class="option-label-badge" th:text="${opt.optionLabel}">A</div>
+                                    <div th:text="${opt.optionText}">Option text</div>
+                                </div>
+                            </div>
+                            
+                            <!-- NAT Numeric Box -->
+                            <div th:if="${q.type.name() == 'NAT'}" class="nat-input-wrapper">
+                                <label class="form-label" th:for="'answer_nat_' + ${q.id}">Enter your numerical answer (decimal value):</label>
+                                <input type="number" 
+                                       step="any" 
+                                       class="form-control" 
+                                       th:name="'answer_nat_' + ${q.id}" 
+                                       th:id="'nat_' + ${q.id}" 
+                                       placeholder="e.g. 12.5" 
+                                       th:oninput="'saveNatInput(\'' + ${q.id} + '\', this.value)'" />
+                            </div>
+                            
+                        </div>
+                    </div>
+                    
+                    <!-- Bottom Action Controls -->
+                    <div class="actions-row">
+                        <div>
+                            <button type="button" class="btn btn-secondary" onclick="clearActiveResponse()">Clear Response</button>
+                            <button type="button" class="btn btn-secondary" style="margin-left: 0.5rem; background-color: #c084fc; color: white;" onclick="markForReviewAndNext()">Mark for Review & Next</button>
+                        </div>
+                        <div>
+                            <button type="button" id="prevBtn" class="btn btn-secondary" onclick="goToPrevQuestion()">Previous</button>
+                            <button type="button" id="nextBtn" class="btn btn-primary" style="margin-left: 0.5rem;" onclick="saveAndNext()">Save & Next</button>
+                        </div>
+                    </div>
+                    
+                </div>
+                
+                <!-- RIGHT PANEL: CONTROL BOARD -->
+                <div class="control-panel">
+                    
+                    <!-- Countdown Live Timer -->
+                    <div id="timerCard" class="timer-card">
+                        <div style="font-size: 0.85rem; font-weight: 600; text-transform: uppercase; color: var(--text-muted);">Time Remaining</div>
+                        <div id="countdownTimer" class="timer-display">03:00:00</div>
+                    </div>
+                    
+                    <!-- Question Navigation Grid -->
+                    <div class="palette-card">
+                        <h4 style="font-weight: 700; margin-bottom: 0.5rem; font-size: 1rem;">Question Palette</h4>
+                        <div class="palette-grid">
+                            <button th:each="q, stat : ${questions}" 
+                                    type="button" 
+                                    th:id="'palette_btn_' + ${stat.index}" 
+                                    class="palette-btn palette-not-visited" 
+                                    th:text="${stat.index + 1}" 
+                                    th:onclick="'jumpToQuestion(' + ${stat.index} + ')'">1</button>
+                        </div>
+                        
+                        <!-- Color Legend Guide -->
+                        <div class="legend-grid">
+                            <div class="legend-item"><span class="legend-color" style="background-color: #34d399;"></span>Answered</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #f87171;"></span>Not Answered</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #f1f5f9; border: 1px solid var(--border-color);"></span>Not Visited</div>
+                            <div class="legend-item"><span class="legend-color" style="background-color: #c084fc;"></span>Marked for Review</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Submit Card Button -->
+                    <button type="button" class="btn btn-danger btn-block" onclick="openSubmitModal()">
+                        Submit Mock Exam
+                    </button>
+                    
+                </div>
+                
+            </div>
+            
+        </form>
+        
+        <!-- SUBMIT CONFIRMATION MODAL -->
+        <div id="submitModal" class="modal">
+            <div class="modal-card">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2" style="margin-bottom: 1rem;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Finish Mock Exam?</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Are you sure you want to submit your paper? You will not be able to change your answers after submitting.</p>
+                <div style="display: flex; gap: 1rem; justify-content: center;">
+                    <button type="button" class="btn btn-secondary" onclick="closeSubmitModal()">Cancel and Resume</button>
+                    <button type="button" class="btn btn-danger" onclick="submitExamForm()">Yes, Submit Paper</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- TIMED OUT MODAL -->
+        <div id="timeoutModal" class="modal">
+            <div class="modal-card">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2" style="margin-bottom: 1rem;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                <h3 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text-primary);">Exam Time is Up!</h3>
+                <p style="color: var(--text-secondary); margin-bottom: 2rem;">Your secure 3-hour timed testing session has automatically completed. We are submitting your responses for evaluations.</p>
+                <button type="button" class="btn btn-primary" onclick="submitExamForm()">Submit and View Scorecard</button>
+            </div>
+        </div>
+
+        <!-- JAVASCRIPT STATE ENGINE -->
+        <script th:inline="javascript">
+            /*<![CDATA[*/
+            const questionsList = /*[[${questions}]]*/ [];
+            const durationMinutes = /*[[${test.durationMinutes}]]*/ 180;
+            const startedAtStr = /*[[${attempt.startedAt}]]*/ '';
+            /*]]>*/
+
+            let activeQuestionIndex = 0;
+            const totalQuestionsCount = questionsList.length;
+
+            // State mappings for questions
+            // State values: 'NOT_VISITED', 'NOT_ANSWERED', 'ANSWERED', 'MARKED', 'MARKED_ANSWERED'
+            const questionStates = new Array(totalQuestionsCount).fill('NOT_VISITED');
+            
+            // Client-side answers cache for quick validation
+            const answersCache = {};
+
+            document.addEventListener("DOMContentLoaded", () => {
+                // Initialize the first question as active and NOT_ANSWERED
+                jumpToQuestion(0);
+                startCountdownTimer();
+            });
+
+            function showQuestion(index) {
+                // Hide all questions
+                for (let i = 0; i < totalQuestionsCount; i++) {
+                    const qBox = document.getElementById('qbox_' + i);
+                    if (qBox) qBox.style.display = 'none';
+                    
+                    const btn = document.getElementById('palette_btn_' + i);
+                    if (btn) btn.classList.remove('palette-active');
+                }
+
+                // Show active question
+                const activeBox = document.getElementById('qbox_' + index);
+                if (activeBox) activeBox.style.display = 'block';
+
+                const activeBtn = document.getElementById('palette_btn_' + index);
+                if (activeBtn) activeBtn.classList.add('palette-active');
+
+                // Adjust Prev/Next button text
+                document.getElementById('prevBtn').disabled = (index === 0);
+                if (index === totalQuestionsCount - 1) {
+                    document.getElementById('nextBtn').innerText = "Save & Review";
+                } else {
+                    document.getElementById('nextBtn').innerText = "Save & Next";
+                }
+
+                activeQuestionIndex = index;
+            }
+
+            function jumpToQuestion(index) {
+                if (index < 0 || index >= totalQuestionsCount) return;
+                
+                // If the previous state was NOT_VISITED, it is now NOT_ANSWERED
+                if (questionStates[index] === 'NOT_VISITED') {
+                    questionStates[index] = 'NOT_ANSWERED';
+                }
+                
+                showQuestion(index);
+                renderPaletteColors();
+            }
+
+            function goToPrevQuestion() {
+                if (activeQuestionIndex > 0) {
+                    jumpToQuestion(activeQuestionIndex - 1);
+                }
+            }
+
+            function selectMcqOption(card, questionId, optionId) {
+                // Clear active selected style
+                const cards = document.querySelectorAll('.option_' + questionId);
+                cards.forEach(c => c.classList.remove('selected'));
+                
+                // Set selected radio and style
+                const radio = document.getElementById('opt_' + optionId);
+                if (radio) radio.checked = true;
+                card.classList.add('selected');
+
+                answersCache[questionId] = optionId;
+            }
+
+            function toggleMsqOption(card, optionId) {
+                const checkbox = document.getElementById('opt_' + optionId);
+                if (!checkbox) return;
+
+                checkbox.checked = !checkbox.checked;
+                if (checkbox.checked) {
+                    card.classList.add('selected');
+                } else {
+                    card.classList.remove('selected');
+                }
+            }
+
+            function saveNatInput(questionId, value) {
+                if (value.trim() !== '') {
+                    answersCache[questionId] = value;
+                } else {
+                    delete answersCache[questionId];
+                }
+            }
+
+            function clearActiveResponse() {
+                const activeQuestion = questionsList[activeQuestionIndex];
+                if (!activeQuestion) return;
+
+                const qId = activeQuestion.id;
+                
+                // Reset styling
+                const cards = document.querySelectorAll('.option_' + qId);
+                cards.forEach(c => c.classList.remove('selected'));
+
+                // Reset inputs
+                if (activeQuestion.type === 'MCQ') {
+                    const radios = document.getElementsByName('answer_mcq_' + qId);
+                    radios.forEach(r => r.checked = false);
+                } else if (activeQuestion.type === 'MSQ') {
+                    const checkboxes = document.getElementsByName('answer_msq_' + qId);
+                    checkboxes.forEach(c => c.checked = false);
+                } else if (activeQuestion.type === 'NAT') {
+                    const nat = document.getElementById('nat_' + qId);
+                    if (nat) nat.value = '';
+                }
+
+                delete answersCache[qId];
+                questionStates[activeQuestionIndex] = 'NOT_ANSWERED';
+                renderPaletteColors();
+            }
+
+            function hasAnswered(index) {
+                const q = questionsList[index];
+                if (!q) return false;
+
+                if (q.type === 'MCQ') {
+                    const radios = document.getElementsByName('answer_mcq_' + q.id);
+                    return Array.from(radios).some(r => r.checked);
+                } else if (q.type === 'MSQ') {
+                    const checkboxes = document.getElementsByName('answer_msq_' + q.id);
+                    return Array.from(checkboxes).some(c => c.checked);
+                } else if (q.type === 'NAT') {
+                    const nat = document.getElementById('nat_' + q.id);
+                    return nat && nat.value.trim() !== '';
+                }
+                return false;
+            }
+
+            function saveAndNext() {
+                // Check if answered
+                if (hasAnswered(activeQuestionIndex)) {
+                    questionStates[activeQuestionIndex] = 'ANSWERED';
+                } else {
+                    questionStates[activeQuestionIndex] = 'NOT_ANSWERED';
+                }
+
+                renderPaletteColors();
+
+                if (activeQuestionIndex < totalQuestionsCount - 1) {
+                    jumpToQuestion(activeQuestionIndex + 1);
+                } else {
+                    openSubmitModal();
+                }
+            }
+
+            function markForReviewAndNext() {
+                if (hasAnswered(activeQuestionIndex)) {
+                    questionStates[activeQuestionIndex] = 'MARKED_ANSWERED';
+                } else {
+                    questionStates[activeQuestionIndex] = 'MARKED';
+                }
+
+                renderPaletteColors();
+
+                if (activeQuestionIndex < totalQuestionsCount - 1) {
+                    jumpToQuestion(activeQuestionIndex + 1);
+                }
+            }
+
+            function renderPaletteColors() {
+                for (let i = 0; i < totalQuestionsCount; i++) {
+                    const btn = document.getElementById('palette_btn_' + i);
+                    if (!btn) continue;
+
+                    // Remove existing color classes
+                    btn.className = 'palette-btn';
+                    if (activeQuestionIndex === i) {
+                        btn.classList.add('palette-active');
+                    }
+
+                    // Apply states matching official specs
+                    const state = questionStates[i];
+                    if (state === 'NOT_VISITED') {
+                        btn.classList.add('palette-not-visited');
+                    } else if (state === 'NOT_ANSWERED') {
+                        btn.classList.add('palette-not-answered');
+                    } else if (state === 'ANSWERED') {
+                        btn.classList.add('palette-answered');
+                    } else if (state === 'MARKED') {
+                        btn.classList.add('palette-marked');
+                    } else if (state === 'MARKED_ANSWERED') {
+                        btn.classList.add('palette-marked');
+                        btn.classList.add('palette-marked-answered');
+                    }
+                }
+            }
+
+            // Countdown Timer Engine
+            function startCountdownTimer() {
+                // Set initial time (e.g. 180 minutes) in seconds
+                let durationSeconds = durationMinutes * 60;
+
+                // Adjust based on when the attempt was actually started (for resuming support!)
+                const startedAtTime = new Date(startedAtStr).getTime();
+                if (!isNaN(startedAtTime)) {
+                    const elapsedSeconds = Math.floor((Date.now() - startedAtTime) / 1000);
+                    if (elapsedSeconds > 0) {
+                        durationSeconds -= elapsedSeconds;
+                    }
+                }
+
+                const timerDisplay = document.getElementById('countdownTimer');
+                const timerCard = document.getElementById('timerCard');
+
+                const interval = setInterval(() => {
+                    if (durationSeconds <= 0) {
+                        clearInterval(interval);
+                        timerDisplay.innerText = "00:00:00";
+                        openTimeoutModal();
+                        return;
+                    }
+
+                    durationSeconds--;
+
+                    const hrs = Math.floor(durationSeconds / 3600);
+                    const mins = Math.floor((durationSeconds % 3600) / 60);
+                    const secs = durationSeconds % 60;
+
+                    const hrsStr = String(hrs).padStart(2, '0');
+                    const minsStr = String(mins).padStart(2, '0');
+                    const secsStr = String(secs).padStart(2, '0');
+
+                    timerDisplay.innerText = `${hrsStr}:${minsStr}:${secsStr}`;
+
+                    // Warn at less than 15 minutes (900 seconds)
+                    if (durationSeconds < 900) {
+                        timerCard.classList.add('timer-warning');
+                    }
+                }, 1000);
+            }
+
+            // Modals
+            function openSubmitModal() {
+                document.getElementById('submitModal').classList.add('active');
+            }
+
+            function closeSubmitModal() {
+                document.getElementById('submitModal').classList.remove('active');
+            }
+
+            function openTimeoutModal() {
+                document.getElementById('timeoutModal').classList.add('active');
+            }
+
+            function submitExamForm() {
+                document.getElementById('examForm').submit();
+            }
+        </script>
+        
+    </div>
+</body>
+</html>
