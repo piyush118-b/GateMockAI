@@ -30,6 +30,25 @@ public class DocumentParserService {
     }
 
     /**
+     * Extract text page-by-page from a PDF using PDFBox
+     */
+    public List<String> parsePdfPages(byte[] pdfBytes) throws IOException {
+        log.info("Parsing PDF page-by-page (size: {} bytes) via Apache PDFBox", pdfBytes.length);
+        List<String> pages = new ArrayList<>();
+        try (PDDocument document = Loader.loadPDF(pdfBytes)) {
+            PDFTextStripper stripper = new PDFTextStripper();
+            int totalPages = document.getNumberOfPages();
+            for (int p = 1; p <= totalPages; p++) {
+                stripper.setStartPage(p);
+                stripper.setEndPage(p);
+                pages.add(stripper.getText(document));
+            }
+            log.info("Successfully extracted {} pages from PDF", pages.size());
+        }
+        return pages;
+    }
+
+    /**
      * Extract text from a plain TXT file
      */
     public String parseTxt(byte[] txtBytes) {

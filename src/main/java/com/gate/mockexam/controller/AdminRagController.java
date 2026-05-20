@@ -59,13 +59,7 @@ public class AdminRagController {
 
         try {
             log.info("Processing uploaded Question Paper file: {}", file.getOriginalFilename());
-            String extractedText = "";
-            if (Objects.requireNonNull(file.getOriginalFilename()).endsWith(".pdf")) {
-                extractedText = documentParserService.parsePdf(file.getBytes());
-            } else {
-                extractedText = documentParserService.parseTxt(file.getBytes());
-            }
-
+            
             // Extract Answer Key PDF text if uploaded
             String extractedAnswerKeyText = "";
             if (answerKeyFile != null && !answerKeyFile.isEmpty()) {
@@ -81,85 +75,126 @@ public class AdminRagController {
             Map<Integer, List<String>> parsedKeys = documentParserService.parseAnswerKey(answerKeyText);
             String keysJson = objectMapper.writeValueAsString(parsedKeys);
 
-            log.info("Starting AI-assisted extraction and alignment mapping using local Qwen");
+            // Split Question Paper into logical page segments
+            List<String> chunks = new ArrayList<>();
+            if (Objects.requireNonNull(file.getOriginalFilename()).endsWith(".pdf")) {
+                List<String> pages = documentParserService.parsePdfPages(file.getBytes());
+                StringBuilder currentChunk = new StringBuilder();
+                for (int i = 0; i < pages.size(); i++) {
+                    currentChunk.append(pages.get(i)).append("\n--- PAGE ").append(i+1).append(" ---\n");
+                    if ((i + 1) % 5 == 0 || i == pages.size() - 1) {
+                        chunks.add(currentChunk.toString());
+                        currentChunk = new StringBuilder();
+                    }
+                }
+            } else {
+                // Split by character length for text files
+                String text = documentParserService.parseTxt(file.getBytes());
+                int len = text.length();
+                int start = 0;
+                while (start < len) {
+                    chunks.add(text.substring(start, Math.min(start + 15000, len)));
+                    start += 15000;
+                }
+            }
+
+            List<AiGeneratedQuestionDto> allQuestions = new ArrayList<>();
+            log.info("Processing past paper document in {} segmented chunks to ensure complete coverage", chunks.size());
             
-            // Build Prompt to instruct Qwen Coder to extract questions and align with answer keys
-            String alignmentPrompt = String.format("""
-                You are a GATE Question Paper and Answer Key Alignment Parser. You are given:
-                1. Raw extracted text of a past GATE Question Paper
-                2. Raw extracted text of the Official Answer Key PDF (if provided)
-                3. A manual list of the Answer Key mapped by question number (if provided)
-                
-                --- RAW QUESTION PAPER TEXT ---
-                %s
-                
-                --- RAW ANSWER KEY DOCUMENT TEXT ---
-                %s
-                
-                --- MANUAL ANSWER KEY LIST MAP ---
-                %s
-                
-                Your job is to match the question numbers, parse out the clean question text, identify the question type (MCQ, MSQ, or NAT), clean up any options, and output a valid JSON matching this schema:
-                {
-                  "title": "Official GATE Past Paper: %s (%s)",
-                  "topic": "%s",
-                  "subject": "%s",
-                  "durationMinutes": 180,
-                  "questions": [
+            for (int chunkIndex = 0; chunkIndex < chunks.size(); chunkIndex++) {
+                String chunkText = chunks.get(chunkIndex);
+                log.info("Processing segment {}/{} of past paper", chunkIndex + 1, chunks.size());
+
+                String segmentPrompt = String.format("""
+                    You are a GATE Question Paper and Answer Key Alignment Parser. You are given:
+                    1. A segment of a GATE past paper (Pages %d to %d equivalent)
+                    2. Raw extracted text of the Official Answer Key PDF (if provided)
+                    3. A manual list of the Answer Key mapped by question number (if provided)
+                    
+                    --- RAW QUESTION PAPER SEGMENT TEXT ---
+                    %s
+                    
+                    --- RAW ANSWER KEY DOCUMENT TEXT ---
+                    %s
+                    
+                    --- MANUAL ANSWER KEY LIST MAP ---
+                    %s
+                    
+                    Extract all questions present in this segment. Identify their type (MCQ, MSQ, or NAT) and align them with the correct official answer.
+                    Output a valid JSON matching this schema:
                     {
-                      "sequenceNo": 1,
-                      "type": "MCQ",
-                      "questionText": "...",
-                      "marks": 1,
-                      "negativeMarks": 0.33,
-                      "explanation": "Official Answer derived from key.",
-                      "subject": "Auto-classified subject based on academic context (e.g., Operating Systems, Databases, Algorithms)",
-                      "topic": "Auto-classified topic based on academic context (e.g., CPU Scheduling, SQL Queries, Asymptotic Notation)",
-                      "options": [
-                        {"label": "A", "text": "...", "isCorrect": true},
-                        {"label": "B", "text": "...", "isCorrect": false},
-                        {"label": "C", "text": "...", "isCorrect": false},
-                        {"label": "D", "text": "...", "isCorrect": false}
+                      "questions": [
+                        {
+                          "sequenceNo": 1,
+                          "type": "MCQ",
+                          "questionText": "...",
+                          "marks": 1,
+                          "negativeMarks": 0.33,
+                          "explanation": "Official Answer derived from key.",
+                          "subject": "Auto-classified subject based on academic context (e.g., Operating Systems, Databases, Algorithms)",
+                          "topic": "Auto-classified topic based on academic context (e.g., CPU Scheduling, SQL Queries, Asymptotic Notation)",
+                          "options": [
+                            {"label": "A", "text": "...", "isCorrect": true},
+                            {"label": "B", "text": "...", "isCorrect": false},
+                            {"label": "C", "text": "...", "isCorrect": false},
+                            {"label": "D", "text": "...", "isCorrect": false}
+                          ]
+                        }
                       ]
                     }
-                  ]
+                    
+                    Ensure:
+                    - Return ONLY clean raw JSON. No markdown backticks.
+                    - If no questions are found in this text segment, return an empty array: {"questions": []}
+                    - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
+                    - MSQ: multiple options marked correct based on Answer Key source context.
+                    - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
+                    - You MUST auto-classify the academic subject (e.g., 'Operating Systems', 'Databases', 'Algorithms') and topic (e.g., 'CPU Scheduling', 'SQL Queries', 'Asymptotic Notation') for every single question in the array.
+                    """,
+                    (chunkIndex * 5) + 1,
+                    Math.min((chunkIndex + 1) * 5, chunks.size() * 5),
+                    chunkText,
+                    extractedAnswerKeyText.isEmpty() ? "No Answer Key PDF uploaded." : extractedAnswerKeyText.substring(0, Math.min(extractedAnswerKeyText.length(), 4000)),
+                    keysJson.equals("{}") ? "No manual list provided." : keysJson
+                );
+
+                try {
+                    String aiResponse = chatClient.prompt()
+                            .user(segmentPrompt)
+                            .call()
+                            .content();
+
+                    String cleaned = aiResponse.trim()
+                            .replaceAll("^```json\\s*", "")
+                            .replaceAll("^```\\s*", "")
+                            .replaceAll("```$", "")
+                            .trim();
+
+                    AiGeneratedTestDto alignedChunk = objectMapper.readValue(cleaned, AiGeneratedTestDto.class);
+                    if (alignedChunk != null && alignedChunk.getQuestions() != null) {
+                        allQuestions.addAll(alignedChunk.getQuestions());
+                        log.info("Extracted {} questions from segment {}", alignedChunk.getQuestions().size(), chunkIndex + 1);
+                    }
+                } catch (Exception segmentEx) {
+                    log.error("Failed to parse segment {}: {}", chunkIndex + 1, segmentEx.getMessage());
                 }
-                
-                Ensure:
-                - Return ONLY clean raw JSON. No markdown backticks.
-                - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
-                - MSQ: multiple options marked correct based on Answer Key source context.
-                - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
-                - You MUST auto-classify the academic subject (e.g., 'Operating Systems', 'Databases', 'Algorithms') and topic (e.g., 'CPU Scheduling', 'SQL Queries', 'Asymptotic Notation') for every single question and put it in the "subject" and "topic" fields of each question in the array.
-                """,  
-                extractedText.substring(0, Math.min(extractedText.length(), 4000)), // Safe window size for local LLM
-                extractedAnswerKeyText.isEmpty() ? "No Answer Key PDF uploaded." : extractedAnswerKeyText.substring(0, Math.min(extractedAnswerKeyText.length(), 3000)),
-                keysJson.equals("{}") ? "No manual list provided." : keysJson,
-                topic,
-                subject,
-                topic,
-                subject
-            );
+            }
 
-            String aiResponse = chatClient.prompt()
-                    .user(alignmentPrompt)
-                    .call()
-                    .content();
+            if (allQuestions.isEmpty()) {
+                throw new IllegalStateException("No questions could be successfully parsed from the document segments. Please verify the PDF format.");
+            }
 
-            log.debug("Raw Ollama Alignment Parser response: {}", aiResponse);
-            
-            // Clean markdown blocks
-            String cleaned = aiResponse.trim()
-                    .replaceAll("^```json\\s*", "")
-                    .replaceAll("^```\\s*", "")
-                    .replaceAll("```$", "")
-                    .trim();
+            // Build aggregated final DTO
+            AiGeneratedTestDto alignedTest = new AiGeneratedTestDto();
+            alignedTest.setTitle("Official GATE Past Paper: " + topic + " (" + subject + ")");
+            alignedTest.setSubject(subject); // overall domain e.g. CSE
+            alignedTest.setTopic(topic);     // overall year e.g. 2019
+            alignedTest.setDurationMinutes(180);
+            alignedTest.setQuestions(allQuestions);
 
-            AiGeneratedTestDto alignedTest = objectMapper.readValue(cleaned, AiGeneratedTestDto.class);
-            
             // Save aligned test DTO inside Session for confirmation
             session.setAttribute("alignedTestDraft", alignedTest);
-            redirectAttributes.addFlashAttribute("success", "Successfully parsed and aligned the past paper using both Question and Answer Key sources! Please review and confirm below.");
+            redirectAttributes.addFlashAttribute("success", String.format("Successfully parsed and aligned the past paper! Extracted a total of %d questions across all PDF pages.", allQuestions.size()));
             return "redirect:/admin/rag/review";
 
         } catch (Exception e) {
