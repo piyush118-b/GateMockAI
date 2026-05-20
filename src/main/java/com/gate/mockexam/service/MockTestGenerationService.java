@@ -304,6 +304,117 @@ public class MockTestGenerationService {
         }
     }
 
+    /**
+     * Generates a full GATE paper based on admin-specified per-subject mark allocations.
+     * subjectWeightages: Map<SubjectName, AllocatedMarks>
+     */
+    @Transactional
+    public MockTest generateWeightedGatePaper(
+            String branchCode,
+            String yearLabel,
+            java.util.Map<String, Integer> subjectWeightages,
+            java.util.function.Consumer<String> progressCallback) {
+
+        log.info("Starting Weighted GATE Paper compilation for branch={} year={}", branchCode, yearLabel);
+
+        MockTest test = MockTest.builder()
+            .title("GATE " + yearLabel + " " + branchCode + " — AI Generated Mock")
+            .topic("Full Syllabus")
+            .subject(branchCode)
+            .branch(branchCode)
+            .yearLabel(yearLabel)
+            .durationMinutes(180)
+            .isPublished(false)
+            .build();
+        test = mockTestRepository.save(test);
+
+        BigDecimal aggregatedTotalMarks = BigDecimal.ZERO;
+        int globalSeqNo = 1;
+        int stepNo = 0;
+        int total = subjectWeightages.size();
+
+        for (java.util.Map.Entry<String, Integer> entry : subjectWeightages.entrySet()) {
+            String subjectName = entry.getKey();
+            int allocatedMarks = entry.getValue();
+            if (allocatedMarks <= 0) continue;
+
+            stepNo++;
+            int percent = (stepNo * 100) / total;
+            progressCallback.accept(String.format(
+                "{\"step\": %d, \"message\": \"Compiling %s (%d marks)...\", \"percent\": %d}",
+                stepNo, subjectName, allocatedMarks, percent));
+
+            // Compute question split: 1-mark MCQs = 60%, 2-mark MCQs = 30%, NAT = 10%
+            int oneMarkMcq = Math.max(1, (int) Math.round(allocatedMarks * 0.6));
+            int twoMarkMcq = Math.max(0, (int) Math.round(allocatedMarks * 0.3 / 2));
+            int nat       = Math.max(0, allocatedMarks - oneMarkMcq - (twoMarkMcq * 2));
+
+            try {
+                List<Document> contextDocs = ragIngestionService.retrieveSimilarQuestions(subjectName, 5);
+                String contextQuestions = IntStream.range(0, contextDocs.size())
+                    .mapToObj(idx -> (idx + 1) + ". " + contextDocs.get(idx).getText())
+                    .collect(Collectors.joining("\n\n"));
+
+                String prompt = loadSegmentTemplate()
+                    .replace("{segmentName}", subjectName)
+                    .replace("{subjects}", subjectName)
+                    .replace("{syllabusFocus}", subjectName + " (comprehensive GATE syllabus)")
+                    .replace("{startSequenceNo}", String.valueOf(globalSeqNo))
+                    .replace("{mcqCount}", String.valueOf(oneMarkMcq + twoMarkMcq))
+                    .replace("{msqCount}", "0")
+                    .replace("{natCount}", String.valueOf(nat))
+                    .replace("{contextCount}", String.valueOf(contextDocs.size()))
+                    .replace("{contextQuestions}", contextQuestions);
+
+                String rawJson = chatClient.prompt().user(prompt).call().content();
+                String cleaned = rawJson.trim()
+                    .replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```$", "").trim();
+
+                AiGeneratedQuestionsListDto listDto = objectMapper.readValue(cleaned, AiGeneratedQuestionsListDto.class);
+
+                for (AiGeneratedQuestionDto qDto : listDto.getQuestions()) {
+                    Question question = Question.builder()
+                        .test(test)
+                        .questionText(qDto.getQuestionText())
+                        .type(QuestionType.valueOf(qDto.getType()))
+                        .marks(BigDecimal.valueOf(qDto.getMarks()))
+                        .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
+                        .correctNatValue(qDto.getCorrectNatValue())
+                        .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
+                        .sequenceNo(globalSeqNo++)
+                        .explanation(qDto.getExplanation())
+                        .build();
+
+                    question = questionRepository.save(question);
+                    aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
+
+                    if (qDto.getOptions() != null) {
+                        for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
+                            Option opt = Option.builder()
+                                .question(question)
+                                .optionLabel(oDto.getLabel().charAt(0))
+                                .optionText(oDto.getText())
+                                .isCorrect(oDto.isCorrect())
+                                .build();
+                            opt = optionRepository.save(opt);
+                            question.getOptions().add(opt);
+                        }
+                    }
+                    test.getQuestions().add(question);
+                }
+
+            } catch (Exception e) {
+                log.error("Failed to compile subject {}: {}", subjectName, e.getMessage(), e);
+                throw new RuntimeException("AI Segment Compilation failed for " + subjectName + ": " + e.getMessage(), e);
+            }
+        }
+
+        test.setTotalMarks(aggregatedTotalMarks);
+        test = mockTestRepository.save(test);
+        log.info("Weighted GATE Paper complete! Questions: {}, Marks: {}", test.getQuestions().size(), test.getTotalMarks());
+        return test;
+    }
+
     @lombok.Data
     public static class AiGeneratedQuestionsListDto {
         private List<AiGeneratedQuestionDto> questions;

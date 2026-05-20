@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::content})}">
+<head>
+    <title th:text="${pageTitle} + ' | GATE MockAI'">Edit Paper | GATE MockAI</title>
+    <style>
+        .editor-toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1rem 1.5rem; background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 14px; margin-bottom: 2rem; gap: 1rem; flex-wrap: wrap;
+        }
+        .q-card {
+            background: var(--card-bg); border: 1px solid var(--border-color);
+            border-radius: 14px; padding: 1.5rem; margin-bottom: 1.5rem;
+            transition: border-color 0.2s;
+        }
+        .q-card:hover { border-color: var(--primary); }
+        .q-card.dirty { border-color: var(--warning); }
+        .q-header {
+            display: flex; align-items: center; gap: 1rem;
+            margin-bottom: 1rem; flex-wrap: wrap;
+        }
+        .q-seq {
+            background: var(--primary); color: #fff; font-weight: 800;
+            width: 36px; height: 36px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; flex-shrink: 0;
+            font-size: 0.85rem;
+        }
+        .q-type-badge {
+            padding: 0.2rem 0.7rem; border-radius: 20px; font-size: 0.75rem;
+            font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .type-MCQ { background: rgba(99,102,241,0.15); color: #818cf8; }
+        .type-MSQ { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .type-NAT { background: rgba(234,179,8,0.15); color: #eab308; }
+        .field-label {
+            font-size: 0.8rem; font-weight: 600; color: var(--text-secondary);
+            text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.4rem;
+        }
+        .edit-textarea {
+            width: 100%; min-height: 80px; padding: 0.75rem; resize: vertical;
+            background: var(--bg-primary); border: 1px solid var(--border-color);
+            border-radius: 8px; color: var(--text-primary); font-family: inherit;
+            font-size: 0.95rem; line-height: 1.5;
+        }
+        .edit-textarea:focus { outline: none; border-color: var(--primary); }
+        .options-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem; }
+        .option-row {
+            display: flex; align-items: flex-start; gap: 0.75rem;
+            background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);
+            border-radius: 8px; padding: 0.75rem;
+        }
+        .option-row.correct-option { border-color: var(--success); background: rgba(34,197,94,0.06); }
+        .option-label { font-weight: 800; color: var(--text-secondary); font-size: 0.95rem; flex-shrink: 0; }
+        .option-text-input {
+            flex: 1; background: transparent; border: none; color: var(--text-primary);
+            font-size: 0.9rem; resize: none; outline: none; font-family: inherit;
+        }
+        .img-upload-zone {
+            border: 2px dashed var(--border-color); border-radius: 8px;
+            padding: 1rem; text-align: center; cursor: pointer; font-size: 0.8rem;
+            color: var(--text-secondary); margin-top: 0.5rem;
+            transition: border-color 0.2s, background 0.2s;
+        }
+        .img-upload-zone:hover { border-color: var(--primary); background: rgba(99,102,241,0.04); }
+        .img-upload-zone img { max-height: 100px; max-width: 100%; border-radius: 6px; margin-top: 0.5rem; }
+        .q-actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .save-indicator {
+            font-size: 0.75rem; color: var(--success); display: none;
+        }
+        .save-indicator.show { display: inline; }
+    </style>
+</head>
+<body>
+<div th:fragment="content">
+
+    <!-- Toolbar -->
+    <div class="editor-toolbar">
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <a th:href="@{/admin/tests/{id}(id=${test.id})}"
+               style="color: var(--text-secondary); text-decoration: none; display: flex; align-items: center; gap: 0.3rem; font-size: 0.9rem;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <polyline points="15 18 9 12 15 6"></polyline></svg> Back to Details
+            </a>
+            <div>
+                <div style="font-size: 1.2rem; font-weight: 800; color: var(--text-primary);"
+                     th:text="${test.title}">Paper Title</div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary);"
+                     th:text="${test.questions.size()} + ' questions | ' + ${test.durationMinutes} + ' minutes'"></div>
+            </div>
+        </div>
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+            <button onclick="addNewQuestion()" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">
+                + Add Question
+            </button>
+            <a th:href="@{/admin/tests/{id}/export(id=${test.id})}" target="_blank"
+               class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">
+                📄 Export PDF
+            </a>
+            <a th:href="@{/admin/tests/{id}(id=${test.id})}"
+               class="btn btn-primary" style="font-size: 0.85rem; padding: 0.6rem 1rem;">
+                ✓ Done Editing
+            </a>
+        </div>
+    </div>
+
+    <!-- Question Editor Cards -->
+    <div id="questionsContainer">
+        <div th:each="q, qStat : ${test.questions}" class="q-card"
+             th:id="'q-card-' + ${q.id}" th:data-question-id="${q.id}">
+
+            <div class="q-header">
+                <div class="q-seq" th:text="${q.sequenceNo}">1</div>
+                <span class="q-type-badge" th:classappend="'type-' + ${q.type}" th:text="${q.type}">MCQ</span>
+                <span style="font-size: 0.8rem; color: var(--text-secondary);"
+                      th:text="${q.marks} + ' marks | -' + ${q.negativeMarks} + ' neg'"></span>
+                <span class="save-indicator" th:id="'saved-' + ${q.id}">✓ Saved</span>
+                <div style="margin-left: auto; display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.3rem 0.75rem;"
+                            th:onclick="'saveQuestion(\'' + ${q.id} + '\')'">Save</button>
+                    <button onclick="deleteQuestion(this)" class="btn" style="font-size: 0.75rem; padding: 0.3rem 0.75rem; background: rgba(239,68,68,0.15); color: #ef4444; border: 1px solid rgba(239,68,68,0.3);"
+                            th:data-question-id="${q.id}">Delete</button>
+                </div>
+            </div>
+
+            <!-- Question Text -->
+            <div class="field-label">Question Text</div>
+            <textarea class="edit-textarea" th:id="'qt-' + ${q.id}"
+                      th:onchange="'markDirty(\'' + ${q.id} + '\')'">
+                <span th:text="${q.questionText}"></span></textarea>
+
+            <!-- Question Image Upload -->
+            <div class="field-label" style="margin-top: 0.75rem;">Question Image (optional)</div>
+            <div class="img-upload-zone" th:id="'qimg-zone-' + ${q.id}"
+                 th:onclick="'triggerImageUpload(\'q\', \'' + ${q.id} + '\')'">
+                <span th:if="${q.imagePath == null}">📎 Click to upload image</span>
+                <img th:if="${q.imagePath != null}" th:src="${q.imagePath}" alt="Question image" />
+            </div>
+            <input type="file" accept="image/*" style="display:none;"
+                   th:id="'qimg-file-' + ${q.id}"
+                   th:onchange="'handleImageUpload(this, \'q\', \'' + ${q.id} + '\')'"/>
+
+            <!-- Options (for MCQ / MSQ) -->
+            <div th:if="${q.type.name() != 'NAT'}" class="options-grid" style="margin-top: 1rem;">
+                <div th:each="opt : ${q.options}"
+                     class="option-row"
+                     th:classappend="${opt.correct} ? ' correct-option' : ''"
+                     th:id="'opt-' + ${opt.id}">
+                    <div class="option-label" th:text="${opt.optionLabel}">A</div>
+                    <textarea class="option-text-input" rows="2"
+                              th:id="'ot-' + ${opt.id}"
+                              th:onchange="'saveOption(\'' + ${opt.id} + '\', \'' + ${q.id} + '\')'">
+                        <span th:text="${opt.optionText}"></span></textarea>
+                    <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: center;">
+                        <label style="font-size: 0.7rem; color: var(--text-secondary);">Correct</label>
+                        <input type="checkbox" th:checked="${opt.correct}"
+                               th:id="'oc-' + ${opt.id}"
+                               th:onchange="'toggleCorrect(\'' + ${opt.id} + '\', \'' + ${q.id} + '\')'"/>
+                        <button class="img-upload-zone" style="padding: 0.3rem; font-size: 0.65rem; margin: 0;"
+                                th:onclick="'triggerImageUpload(\'opt\', \'' + ${opt.id} + '\')'">
+                            <span th:if="${opt.imagePath == null}">🖼</span>
+                            <img th:if="${opt.imagePath != null}" th:src="${opt.imagePath}" style="max-height: 36px;"/>
+                        </button>
+                        <input type="file" accept="image/*" style="display:none;"
+                               th:id="'optimg-file-' + ${opt.id}"
+                               th:onchange="'handleImageUpload(this, \'opt\', \'' + ${opt.id} + '\')'"/>
+                    </div>
+                </div>
+            </div>
+
+            <!-- NAT answer field -->
+            <div th:if="${q.type.name() == 'NAT'}" style="margin-top: 1rem;">
+                <div class="field-label">Correct NAT Value</div>
+                <input type="number" step="0.01"
+                       th:value="${q.correctNatValue}"
+                       th:id="'nat-' + ${q.id}"
+                       class="form-control" style="max-width: 200px;"
+                       th:onchange="'saveQuestion(\'' + ${q.id} + '\')'"/>
+            </div>
+
+            <!-- Explanation -->
+            <div class="field-label" style="margin-top: 1rem;">Explanation / Derivation</div>
+            <textarea class="edit-textarea" th:id="'exp-' + ${q.id}"
+                      th:onchange="'markDirty(\'' + ${q.id} + '\')'">
+                <span th:text="${q.explanation}"></span></textarea>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        const TEST_ID = /*[[${test.id}]]*/ '';
+
+        function markDirty(qId) {
+            document.getElementById('q-card-' + qId).classList.add('dirty');
+        }
+
+        function saveQuestion(qId) {
+            const questionText = document.getElementById('qt-' + qId)?.value?.trim();
+            const explanation  = document.getElementById('exp-' + qId)?.value?.trim();
+            const natEl = document.getElementById('nat-' + qId);
+            const payload = { questionText, explanation };
+            if (natEl) payload.correctNatValue = parseFloat(natEl.value);
+
+            fetch(`/admin/tests/${TEST_ID}/questions/${qId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(payload)
+            }).then(r => {
+                if (r.ok) {
+                    const card = document.getElementById('q-card-' + qId);
+                    card.classList.remove('dirty');
+                    const indicator = document.getElementById('saved-' + qId);
+                    indicator.classList.add('show');
+                    setTimeout(() => indicator.classList.remove('show'), 2000);
+                }
+            });
+        }
+
+        function saveOption(optId, qId) {
+            const text = document.getElementById('ot-' + optId)?.value?.trim();
+            const isCorrect = document.getElementById('oc-' + optId)?.checked ?? false;
+            fetch(`/admin/tests/${TEST_ID}/options/${optId}`, {
+                method: 'PATCH',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ optionText: text, isCorrect })
+            });
+        }
+
+        function toggleCorrect(optId, qId) {
+            saveOption(optId, qId);
+            const row = document.getElementById('opt-' + optId);
+            const checked = document.getElementById('oc-' + optId).checked;
+            if (checked) row.classList.add('correct-option');
+            else row.classList.remove('correct-option');
+        }
+
+        function triggerImageUpload(type, id) {
+            const prefix = type === 'q' ? 'qimg-file-' : 'optimg-file-';
+            document.getElementById(prefix + id)?.click();
+        }
+
+        function handleImageUpload(input, type, id) {
+            if (!input.files?.length) return;
+            const fd = new FormData();
+            fd.append('file', input.files[0]);
+            fetch('/admin/upload/image', { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if (data.url) {
+                        const endpoint = type === 'q'
+                            ? `/admin/tests/${TEST_ID}/questions/${id}`
+                            : `/admin/tests/${TEST_ID}/options/${id}`;
+                        fetch(endpoint, {
+                            method: 'PATCH',
+                            headers: {'Content-Type': 'application/json'},
+                            body: JSON.stringify({ imagePath: data.url })
+                        }).then(() => {
+                            const zoneId = type === 'q' ? 'qimg-zone-' + id : 'opt-' + id;
+                            const zone = document.getElementById(zoneId);
+                            if (zone) {
+                                let img = zone.querySelector('img') || document.createElement('img');
+                                img.src = data.url;
+                                img.style.maxHeight = '100px';
+                                zone.innerHTML = '';
+                                zone.appendChild(img);
+                            }
+                        });
+                    }
+                });
+        }
+
+        function addNewQuestion() {
+            fetch(`/admin/tests/${TEST_ID}/questions`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ questionText: 'New Question' })
+            }).then(r => r.json()).then(data => {
+                if (data.questionId) {
+                    alert('New question added! Refreshing page...');
+                    window.location.reload();
+                }
+            });
+        }
+
+        function deleteQuestion(btn) {
+            const qId = btn.dataset.questionId;
+            if (!confirm('Delete this question permanently?')) return;
+            fetch(`/admin/tests/${TEST_ID}/questions/${qId}`, { method: 'DELETE' })
+                .then(r => {
+                    if (r.ok) {
+                        document.getElementById('q-card-' + qId)?.remove();
+                    }
+                });
+        }
+    </script>
+</div>
+</body>
+</html>

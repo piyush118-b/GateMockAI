@@ -38,6 +38,13 @@ public class MockTest {
     @Column(name = "is_published", nullable = false)
     private boolean isPublished;
 
+    @Column(name = "branch")
+    private String branch;
+
+    @Column(name = "year_label")
+    private String yearLabel;
+
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

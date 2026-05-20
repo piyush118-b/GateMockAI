@@ -29,4 +29,7 @@ public class Option {
 
     @Column(name = "is_correct", nullable = false)
     private boolean isCorrect;
+
+    @Column(name = "image_path", columnDefinition = "TEXT")
+    private String imagePath;
 }

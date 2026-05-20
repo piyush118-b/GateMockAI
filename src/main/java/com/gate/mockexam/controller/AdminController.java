@@ -2,7 +2,9 @@ package com.gate.mockexam.controller;
 
 import com.gate.mockexam.dto.MockTestGenerationRequestDto;
 import com.gate.mockexam.dto.MockTestSummaryDto;
+import com.gate.mockexam.entity.Branch;
 import com.gate.mockexam.entity.MockTest;
+import com.gate.mockexam.repository.BranchRepository;
 import com.gate.mockexam.service.MockTestGenerationService;
 import com.gate.mockexam.service.MockTestService;
 import com.gate.mockexam.service.RagIngestionService;
@@ -21,6 +23,7 @@ import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.http.ResponseEntity;
 
 @Controller
 @RequestMapping("/admin")
@@ -30,16 +33,19 @@ public class AdminController {
     private final MockTestService mockTestService;
     private final RagIngestionService ragIngestionService;
     private final MockTestGenerationService generationService;
+    private final BranchRepository branchRepository;
 
     @Value("${gate.rag.vector-store-path}")
     private String vectorStorePath;
 
-    public AdminController(MockTestService mockTestService, 
-                           RagIngestionService ragIngestionService, 
-                           MockTestGenerationService generationService) {
+    public AdminController(MockTestService mockTestService,
+                           RagIngestionService ragIngestionService,
+                           MockTestGenerationService generationService,
+                           BranchRepository branchRepository) {
         this.mockTestService = mockTestService;
         this.ragIngestionService = ragIngestionService;
         this.generationService = generationService;
+        this.branchRepository = branchRepository;
     }
 
     @GetMapping("/dashboard")
@@ -63,20 +69,21 @@ public class AdminController {
         return "admin/tests";
     }
 
-    // GET /admin/tests/generate — show the form
+    // GET /admin/tests/generate — show the form (loaded from DB)
     @GetMapping("/tests/generate")
     public String generateForm(Model model) {
         model.addAttribute("pageTitle", "AI Exam Generator");
         model.addAttribute("request", new MockTestGenerationRequestDto());
-        model.addAttribute("subjects", List.of(
-            "Operating Systems", "DBMS", "Computer Networks",
-            "Data Structures & Algorithms", "Theory of Computation",
-            "Computer Organization", "Discrete Mathematics"
-        ));
+        List<Branch> branches = branchRepository.findAll();
+        model.addAttribute("branches", branches);
+        // Default to first branch (CSE)
+        if (!branches.isEmpty()) {
+            model.addAttribute("defaultBranch", branches.get(0));
+        }
         return "admin/generate";
     }
 
-    // POST /admin/tests/generate — trigger AI generation
+    // POST /admin/tests/generate — trigger AI custom-topic generation
     @PostMapping("/tests/generate")
     public String generate(@Valid @ModelAttribute("request") MockTestGenerationRequestDto request,
                             BindingResult result,
@@ -84,11 +91,7 @@ public class AdminController {
                             RedirectAttributes redirectAttributes) {
         if (result.hasErrors()) {
             model.addAttribute("pageTitle", "AI Exam Generator");
-            model.addAttribute("subjects", List.of(
-                "Operating Systems", "DBMS", "Computer Networks",
-                "Data Structures & Algorithms", "Theory of Computation",
-                "Computer Organization", "Discrete Mathematics"
-            ));
+            model.addAttribute("branches", branchRepository.findAll());
             return "admin/generate";
         }
         try {
@@ -99,6 +102,23 @@ public class AdminController {
         } catch (Exception e) {
             redirectAttributes.addFlashAttribute("error", "Generation failed: " + e.getMessage());
             return "redirect:/admin/tests/generate";
+        }
+    }
+
+    // POST /admin/tests/generate/weighted — trigger full weighted-syllabus generation
+    @PostMapping("/tests/generate/weighted")
+    @ResponseBody
+    public ResponseEntity<Map<String, String>> generateWeighted(
+            @RequestParam String branchCode,
+            @RequestParam String yearLabel,
+            @RequestBody Map<String, Integer> subjectWeightages,
+            RedirectAttributes redirectAttributes) {
+        // subjectWeightages: { subjectName -> allocatedMarks }
+        try {
+            MockTest test = generationService.generateWeightedGatePaper(branchCode, yearLabel, subjectWeightages, msg -> {});
+            return ResponseEntity.ok(Map.of("redirectUrl", "/admin/tests/" + test.getId()));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
 

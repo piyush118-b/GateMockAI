@@ -50,6 +50,10 @@ public class Question {
     @Column(columnDefinition = "TEXT")
     private String explanation;
 
+    @Column(name = "image_path", columnDefinition = "TEXT")
+    private String imagePath;
+
+
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @OrderBy("optionLabel ASC")
     @Builder.Default
