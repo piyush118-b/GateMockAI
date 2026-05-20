@@ -45,6 +45,7 @@ public class AdminRagController {
     @PostMapping("/upload")
     public String handlePdfUpload(
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "answerKeyFile", required = false) MultipartFile answerKeyFile,
             @RequestParam("subject") String subject,
             @RequestParam("topic") String topic,
             @RequestParam("answerKeyText") String answerKeyText,
@@ -57,7 +58,7 @@ public class AdminRagController {
         }
 
         try {
-            log.info("Processing uploaded file: {}", file.getOriginalFilename());
+            log.info("Processing uploaded Question Paper file: {}", file.getOriginalFilename());
             String extractedText = "";
             if (Objects.requireNonNull(file.getOriginalFilename()).endsWith(".pdf")) {
                 extractedText = documentParserService.parsePdf(file.getBytes());
@@ -65,7 +66,18 @@ public class AdminRagController {
                 extractedText = documentParserService.parseTxt(file.getBytes());
             }
 
-            // Parse answer key entry
+            // Extract Answer Key PDF text if uploaded
+            String extractedAnswerKeyText = "";
+            if (answerKeyFile != null && !answerKeyFile.isEmpty()) {
+                log.info("Processing uploaded Answer Key file: {}", answerKeyFile.getOriginalFilename());
+                if (Objects.requireNonNull(answerKeyFile.getOriginalFilename()).endsWith(".pdf")) {
+                    extractedAnswerKeyText = documentParserService.parsePdf(answerKeyFile.getBytes());
+                } else {
+                    extractedAnswerKeyText = documentParserService.parseTxt(answerKeyFile.getBytes());
+                }
+            }
+
+            // Parse manual answer key text if provided
             Map<Integer, List<String>> parsedKeys = documentParserService.parseAnswerKey(answerKeyText);
             String keysJson = objectMapper.writeValueAsString(parsedKeys);
 
@@ -73,14 +85,18 @@ public class AdminRagController {
             
             // Build Prompt to instruct Qwen Coder to extract questions and align with answer keys
             String alignmentPrompt = String.format("""
-                You are a GATE Question Paper Parser. You are given:
+                You are a GATE Question Paper and Answer Key Alignment Parser. You are given:
                 1. Raw extracted text of a past GATE Question Paper
-                2. A JSON map of the Official Answer Key matching Question Number to Correct Answer option letter(s) or NAT value.
+                2. Raw extracted text of the Official Answer Key PDF (if provided)
+                3. A manual list of the Answer Key mapped by question number (if provided)
                 
-                --- RAW PAPER TEXT ---
+                --- RAW QUESTION PAPER TEXT ---
                 %s
                 
-                --- OFFICIAL ANSWER KEY MAP ---
+                --- RAW ANSWER KEY DOCUMENT TEXT ---
+                %s
+                
+                --- MANUAL ANSWER KEY LIST MAP ---
                 %s
                 
                 Your job is to match the question numbers, parse out the clean question text, identify the question type (MCQ, MSQ, or NAT), clean up any options, and output a valid JSON matching this schema:
@@ -96,7 +112,7 @@ public class AdminRagController {
                       "questionText": "...",
                       "marks": 1,
                       "negativeMarks": 0.33,
-                      "explanation": "Official Answer is A.",
+                      "explanation": "Official Answer derived from key.",
                       "options": [
                         {"label": "A", "text": "...", "isCorrect": true},
                         {"label": "B", "text": "...", "isCorrect": false},
@@ -109,12 +125,13 @@ public class AdminRagController {
                 
                 Ensure:
                 - Return ONLY clean raw JSON. No markdown backticks.
-                - MCQ: exactly 4 options. Correct option label MUST match the Answer Key Map.
-                - MSQ: multiple options marked correct based on Answer Key Map.
-                - NAT: no options, set correctNatValue to the exact value from the Answer Key Map.
+                - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
+                - MSQ: multiple options marked correct based on Answer Key source context.
+                - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
                 """, 
                 extractedText.substring(0, Math.min(extractedText.length(), 4000)), // Safe window size for local LLM
-                keysJson,
+                extractedAnswerKeyText.isEmpty() ? "No Answer Key PDF uploaded." : extractedAnswerKeyText.substring(0, Math.min(extractedAnswerKeyText.length(), 3000)),
+                keysJson.equals("{}") ? "No manual list provided." : keysJson,
                 topic,
                 subject,
                 topic,
@@ -139,7 +156,7 @@ public class AdminRagController {
             
             // Save aligned test DTO inside Session for confirmation
             session.setAttribute("alignedTestDraft", alignedTest);
-            redirectAttributes.addFlashAttribute("success", "Successfully parsed and aligned the past paper! Please review and confirm below.");
+            redirectAttributes.addFlashAttribute("success", "Successfully parsed and aligned the past paper using both Question and Answer Key sources! Please review and confirm below.");
             return "redirect:/admin/rag/review";
 
         } catch (Exception e) {
