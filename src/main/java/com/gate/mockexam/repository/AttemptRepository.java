@@ -10,4 +10,7 @@ import java.util.UUID;
 public interface AttemptRepository extends JpaRepository<Attempt, UUID> {
     List<Attempt> findByUserIdOrderByStartedAtDesc(UUID userId);
     List<Attempt> findByUserIdAndTestIdOrderByStartedAtDesc(UUID userId, UUID testId);
+
+    void deleteByTestId(UUID testId);
 }
+

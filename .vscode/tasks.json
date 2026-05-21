@@ -1,0 +1,136 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    // ─────────────────────────────────────────────────────────────────
+    // 1. START DATABASE (Docker Compose – Postgres + Ollama)
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "🐳 Start Database (Docker)",
+      "type": "shell",
+      "command": "docker compose up -d",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "infra"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 2. STOP DATABASE
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "🛑 Stop Database (Docker)",
+      "type": "shell",
+      "command": "docker compose down",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "infra"
+      },
+      "problemMatcher": []
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 3. BUILD FRONTEND (Vite – compiles React into static/assets)
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "⚡ Build Frontend (Vite)",
+      "type": "shell",
+      "command": "npm run build",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "frontend"
+      },
+      "problemMatcher": ["$tsc"]
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 4. WATCH FRONTEND (Vite dev watcher – auto-rebuild on save)
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "👀 Watch Frontend (Vite Dev)",
+      "type": "shell",
+      "command": "npm run build -- --watch",
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      },
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "frontend"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "."
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*building.*$",
+          "endsPattern": "^.*built in.*$"
+        }
+      }
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 5. COMPILE BACKEND (Maven compile only)
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "🔨 Compile Backend (Maven)",
+      "type": "shell",
+      "command": "mvn compile",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "backend"
+      },
+      "problemMatcher": ["$javac"]
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 6. RUN TESTS
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "🧪 Run Tests (Maven)",
+      "type": "shell",
+      "command": "mvn test",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "backend"
+      },
+      "problemMatcher": ["$javac"]
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 7. FULL BUILD: Frontend + Backend together
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "label": "🏗️ Full Build (Frontend + Backend)",
+      "dependsOn": ["⚡ Build Frontend (Vite)", "🔨 Compile Backend (Maven)"],
+      "dependsOrder": "sequence",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

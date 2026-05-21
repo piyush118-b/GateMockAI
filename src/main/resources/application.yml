@@ -1,4 +1,12 @@
 spring:
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 50MB
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
   application:
     name: gate-mock-exam
   ai:
@@ -40,6 +48,9 @@ spring:
 
 server:
   port: 8085
+  servlet:
+    session:
+      timeout: 30d
 
 logging:
   level:

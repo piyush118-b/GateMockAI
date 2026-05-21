@@ -1,31 +1,27 @@
 package com.gate.mockexam.controller;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gate.mockexam.dto.*;
 import com.gate.mockexam.entity.MockTest;
 import com.gate.mockexam.service.DocumentParserService;
 import com.gate.mockexam.service.MockTestGenerationService;
 import com.gate.mockexam.service.RagIngestionService;
-import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.document.Document;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
-// @Controller
-// @RequestMapping("/admin/rag")
+@RestController
+@RequestMapping("/api/admin/rag")
 @Slf4j
 @RequiredArgsConstructor
 public class AdminRagController {
@@ -36,30 +32,28 @@ public class AdminRagController {
     private final ChatClient chatClient;
     private final ObjectMapper objectMapper;
 
-    @GetMapping
-    public String ragDashboard(Model model) {
-        model.addAttribute("vectorCount", ragIngestionService.getVectorCount());
-        return "admin/rag";
-    }
 
-    @PostMapping("/upload")
-    public String handlePdfUpload(
+
+    /**
+     * POST /api/admin/rag/upload (multipart)
+     * Parses PDF/TXT, extracts & aligns questions with answer key using Ollama AI.
+     * Returns the aligned draft as JSON — client holds this in state for review.
+     */
+    @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> handlePdfUpload(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "answerKeyFile", required = false) MultipartFile answerKeyFile,
             @RequestParam("subject") String subject,
             @RequestParam("topic") String topic,
-            @RequestParam("answerKeyText") String answerKeyText,
-            HttpSession session,
-            RedirectAttributes redirectAttributes) {
+            @RequestParam(value = "answerKeyText", defaultValue = "") String answerKeyText) {
 
         if (file.isEmpty()) {
-            redirectAttributes.addFlashAttribute("error", "Please select a GATE Question Paper PDF to upload.");
-            return "redirect:/admin/rag";
+            return ResponseEntity.badRequest().body(Map.of("error", "Please select a GATE Question Paper PDF to upload."));
         }
 
         try {
             log.info("Processing uploaded Question Paper file: {}", file.getOriginalFilename());
-            
+
             // Extract Answer Key PDF text if uploaded
             String extractedAnswerKeyText = "";
             if (answerKeyFile != null && !answerKeyFile.isEmpty()) {
@@ -71,95 +65,96 @@ public class AdminRagController {
                 }
             }
 
-            // Parse manual answer key text if provided
-            Map<Integer, List<String>> parsedKeys = documentParserService.parseAnswerKey(answerKeyText);
-            String keysJson = objectMapper.writeValueAsString(parsedKeys);
+            // Parse advanced answer keys into a structured map (SECTION_QNO -> AnswerKeyEntry)
+            Map<String, DocumentParserService.AnswerKeyEntry> answerKeyMap = new HashMap<>();
+            if (!extractedAnswerKeyText.isEmpty()) {
+                answerKeyMap.putAll(documentParserService.parseAnswerKeyToMap(extractedAnswerKeyText));
+            }
+            if (answerKeyText != null && !answerKeyText.isBlank()) {
+                answerKeyMap.putAll(documentParserService.parseAnswerKeyToMap(answerKeyText));
+            }
+            log.info("Total parsed answer key entries: {}", answerKeyMap.size());
 
-            // Split Question Paper into logical page segments
+            // Split Question Paper into logical page segments (3 pages with 1 page overlap)
             List<String> chunks = new ArrayList<>();
             if (Objects.requireNonNull(file.getOriginalFilename()).endsWith(".pdf")) {
                 List<String> pages = documentParserService.parsePdfPages(file.getBytes());
-                StringBuilder currentChunk = new StringBuilder();
-                for (int i = 0; i < pages.size(); i++) {
-                    currentChunk.append(pages.get(i)).append("\n--- PAGE ").append(i+1).append(" ---\n");
-                    if ((i + 1) % 5 == 0 || i == pages.size() - 1) {
-                        chunks.add(currentChunk.toString());
-                        currentChunk = new StringBuilder();
+                log.info("Total PDF pages: {}", pages.size());
+                int step = 2;
+                int chunkSize = 3;
+                for (int startPage = 0; startPage < pages.size(); startPage += step) {
+                    StringBuilder currentChunk = new StringBuilder();
+                    int endPage = Math.min(startPage + chunkSize, pages.size());
+                    for (int p = startPage; p < endPage; p++) {
+                        currentChunk.append(pages.get(p)).append("\n--- PAGE ").append(p + 1).append(" ---\n");
+                    }
+                    chunks.add(currentChunk.toString());
+                    if (endPage == pages.size()) {
+                        break;
                     }
                 }
             } else {
-                // Split by character length for text files
                 String text = documentParserService.parseTxt(file.getBytes());
                 int len = text.length();
                 int start = 0;
+                int size = 15000;
+                int overlap = 3000;
                 while (start < len) {
-                    chunks.add(text.substring(start, Math.min(start + 15000, len)));
-                    start += 15000;
+                    int end = Math.min(start + size, len);
+                    chunks.add(text.substring(start, end));
+                    if (end == len) break;
+                    start += (size - overlap);
                 }
             }
 
             List<AiGeneratedQuestionDto> allQuestions = new ArrayList<>();
-            log.info("Processing past paper document in {} segmented chunks to ensure complete coverage", chunks.size());
-            
+            log.info("Processing past paper document in {} segmented chunks", chunks.size());
+
             for (int chunkIndex = 0; chunkIndex < chunks.size(); chunkIndex++) {
                 String chunkText = chunks.get(chunkIndex);
                 log.info("Processing segment {}/{} of past paper", chunkIndex + 1, chunks.size());
 
                 String segmentPrompt = String.format("""
-                    You are a GATE Question Paper and Answer Key Alignment Parser. You are given:
-                    1. A segment of a GATE past paper (Pages %d to %d equivalent)
-                    2. Raw extracted text of the Official Answer Key PDF (if provided)
-                    3. A manual list of the Answer Key mapped by question number (if provided)
+                    You are a GATE Exam Question Extractor.
+                    Analyze the following segment of a GATE past paper and extract all written exam questions.
                     
                     --- RAW QUESTION PAPER SEGMENT TEXT ---
                     %s
                     
-                    --- RAW ANSWER KEY DOCUMENT TEXT ---
-                    %s
-                    
-                    --- MANUAL ANSWER KEY LIST MAP ---
-                    %s
-                    
-                    Extract all questions present in this segment. Identify their type (MCQ, MSQ, or NAT) and align them with the correct official answer.
+                    For each question, extract:
+                    1. "sequenceNo": The printed question number (e.g., 1, 2, 3...).
+                    2. "section": The section it belongs to: "GA" (General Aptitude, usually questions 1-10 at the start of the exam) or "CS" (Computer Science, usually questions 1-55). If not explicitly written, infer from context.
+                    3. "type": "MCQ" (multiple choice with options), "MSQ" (multiple select with options), or "NAT" (numerical answer type, no options).
+                    4. "questionText": The complete and exact text of the question, including any context or inline equations. Do not truncate or use placeholders.
+                    5. "options": For MCQ/MSQ, list all options with:
+                       - "label": "A", "B", "C", "D", etc.
+                       - "text": The option content. Do not truncate or use placeholders.
+                       For NAT, leave this list empty or null.
+                       
                     Output a valid JSON matching this schema:
                     {
                       "questions": [
                         {
                           "sequenceNo": 1,
+                          "section": "GA",
                           "type": "MCQ",
                           "questionText": "...",
-                          "marks": 1,
-                          "negativeMarks": 0.33,
-                          "explanation": "Official Answer derived from key.",
-                          "subject": "Auto-classified subject based on academic context (e.g., Operating Systems, Databases, Algorithms)",
-                          "topic": "Auto-classified topic based on academic context (e.g., CPU Scheduling, SQL Queries, Asymptotic Notation)",
                           "options": [
-                            {"label": "A", "text": "...", "isCorrect": true},
-                            {"label": "B", "text": "...", "isCorrect": false},
-                            {"label": "C", "text": "...", "isCorrect": false},
-                            {"label": "D", "text": "...", "isCorrect": false}
+                            {"label": "A", "text": "..."},
+                            {"label": "B", "text": "..."},
+                            {"label": "C", "text": "..."},
+                            {"label": "D", "text": "..."}
                           ]
                         }
                       ]
                     }
                     
                     Ensure:
-                    - Return ONLY clean raw JSON. No markdown backticks.
-                    - CRITICAL: Extract ONLY the actual, real academic exam questions physically written inside "RAW QUESTION PAPER SEGMENT TEXT".
-                    - CRITICAL: Do NOT generate or invent any dummy questions, placeholder questions, general knowledge questions (e.g., "Capital of France", "prime number", "chemical symbol for water", "Red Planet"), or repeat the same question multiple times.
-                    - If no questions are found in this text segment, return an empty array: {"questions": []}
-                    - If a segment contains only a few questions, extract exactly only those questions.
-                    - MCQ: exactly 4 options. Correct option label MUST match the Answer Key source context.
-                    - MSQ: multiple options marked correct based on Answer Key source context.
-                    - NAT: no options, set correctNatValue to the exact value from the Answer Key source.
-                    - You MUST auto-classify the academic subject (e.g., 'Operating Systems', 'Databases', 'Algorithms') and topic (e.g., 'CPU Scheduling', 'SQL Queries', 'Asymptotic Notation') for every single question in the array.
-                    """,
-                    (chunkIndex * 5) + 1,
-                    Math.min((chunkIndex + 1) * 5, chunks.size() * 5),
-                    chunkText,
-                    extractedAnswerKeyText.isEmpty() ? "No Answer Key PDF uploaded." : extractedAnswerKeyText.substring(0, Math.min(extractedAnswerKeyText.length(), 4000)),
-                    keysJson.equals("{}") ? "No manual list provided." : keysJson
-                );
+                    - Return ONLY clean raw JSON. No markdown backticks or explanation.
+                    - Extract ONLY the actual academic exam questions physically written inside the segment text. Do NOT make up any questions.
+                    - If no questions are found in this text segment, return: {"questions": []}
+                    - Pay close attention to equations, symbols, and complete text. Never truncate text with "..." in the JSON fields.
+                    """, chunkText);
 
                 try {
                     String aiResponse = chatClient.prompt()
@@ -184,99 +179,200 @@ public class AdminRagController {
             }
 
             if (allQuestions.isEmpty()) {
-                throw new IllegalStateException("No questions could be successfully parsed from the document segments. Please verify the PDF format.");
+                return ResponseEntity.status(422).body(Map.of("error",
+                        "No questions could be successfully parsed from the document segments. Please verify the PDF format."));
+            }
+
+            // Deduplicate questions from overlapping chunks: group by section + "_" + sequenceNo
+            Map<String, List<AiGeneratedQuestionDto>> grouped = allQuestions.stream()
+                    .filter(q -> q.getSequenceNo() > 0 && q.getSection() != null)
+                    .collect(Collectors.groupingBy(q -> q.getSection().toUpperCase() + "_" + q.getSequenceNo()));
+
+            List<AiGeneratedQuestionDto> uniqueQuestions = new ArrayList<>();
+            for (Map.Entry<String, List<AiGeneratedQuestionDto>> entry : grouped.entrySet()) {
+                List<AiGeneratedQuestionDto> duplicates = entry.getValue();
+                // Find candidate with longest question text and most options
+                AiGeneratedQuestionDto best = duplicates.stream()
+                        .max(Comparator.comparingInt((AiGeneratedQuestionDto q) -> q.getQuestionText() != null ? q.getQuestionText().length() : 0)
+                                .thenComparingInt(q -> q.getOptions() != null ? q.getOptions().size() : 0))
+                        .orElse(null);
+                if (best != null) {
+                    uniqueQuestions.add(best);
+                }
+            }
+
+            // Programmatically align each question with the Answer Key map
+            for (AiGeneratedQuestionDto q : uniqueQuestions) {
+                String sec = q.getSection().toUpperCase().trim();
+                int qNo = q.getSequenceNo();
+                String key = sec + "_" + qNo;
+
+                // Set fallback defaults
+                q.setMarks(qNo <= 5 && sec.equals("GA") || qNo <= 25 && sec.equals("CS") ? 1.0 : 2.0);
+                q.setExplanation("Official Answer derived from key.");
+                q.setSubject(subject);
+                q.setTopic(topic);
+
+                DocumentParserService.AnswerKeyEntry entry = answerKeyMap.get(key);
+                if (entry != null) {
+                    q.setType(entry.getType());
+                    q.setMarks(entry.getMarks());
+
+                    if ("MCQ".equals(entry.getType()) || "MSQ".equals(entry.getType())) {
+                        q.setNegativeMarks("MCQ".equals(entry.getType()) ? (entry.getMarks() == 1.0 ? 0.33 : 0.67) : 0.0);
+                        
+                        // Parse correct labels
+                        Set<String> correctLabels = new HashSet<>();
+                        if (entry.getCorrectKey() != null) {
+                            Matcher m = Pattern.compile("[A-D]").matcher(entry.getCorrectKey().toUpperCase());
+                            while (m.find()) {
+                                correctLabels.add(m.group());
+                            }
+                        }
+
+                        if (q.getOptions() == null) {
+                            q.setOptions(new ArrayList<>());
+                        }
+                        
+                        // Mark correct options
+                        for (AiGeneratedOptionDto opt : q.getOptions()) {
+                            if (opt.getLabel() != null) {
+                                opt.setCorrect(correctLabels.contains(opt.getLabel().toUpperCase()));
+                            }
+                        }
+                    } else if ("NAT".equals(entry.getType())) {
+                        q.setNegativeMarks(0.0);
+                        q.setOptions(new ArrayList<>());
+                        
+                        // Parse NAT ranges/values
+                        List<Double> nums = new ArrayList<>();
+                        if (entry.getCorrectKey() != null) {
+                            Matcher m = Pattern.compile("-?\\d+(?:\\.\\d+)?").matcher(entry.getCorrectKey());
+                            while (m.find()) {
+                                try {
+                                    nums.add(Double.parseDouble(m.group()));
+                                } catch (NumberFormatException nfe) {
+                                    // ignore
+                                }
+                            }
+                        }
+                        if (nums.size() >= 2) {
+                            double low = nums.get(0);
+                            double high = nums.get(1);
+                            q.setCorrectNatValue(Math.round(((low + high) / 2.0) * 10000.0) / 10000.0);
+                            q.setNatTolerance(Math.round((Math.abs(high - low) / 2.0) * 10000.0) / 10000.0);
+                        } else if (nums.size() == 1) {
+                            q.setCorrectNatValue(nums.get(0));
+                            q.setNatTolerance(0.0);
+                        } else {
+                            q.setCorrectNatValue(null);
+                            q.setNatTolerance(0.0);
+                        }
+                    }
+                } else {
+                    // Default negative marking if key entry not found but type is MCQ
+                    if ("MCQ".equals(q.getType())) {
+                        q.setNegativeMarks(q.getMarks() == 1.0 ? 0.33 : 0.67);
+                    } else {
+                        q.setNegativeMarks(0.0);
+                    }
+                }
+            }
+
+            // Sort questions: GA (1 to 10) first, then CS (1 to 55)
+            uniqueQuestions.sort((q1, q2) -> {
+                String sec1 = q1.getSection().toUpperCase().trim();
+                String sec2 = q2.getSection().toUpperCase().trim();
+                if (!sec1.equals(sec2)) {
+                    return sec1.equals("GA") ? -1 : 1;
+                }
+                return Integer.compare(q1.getSequenceNo(), q2.getSequenceNo());
+            });
+
+            // Adjust global sequenceNo after sorting (so they are sequential 1 to 65 for the final exam)
+            for (int i = 0; i < uniqueQuestions.size(); i++) {
+                uniqueQuestions.get(i).setSequenceNo(i + 1);
             }
 
             // Build aggregated final DTO
             AiGeneratedTestDto alignedTest = new AiGeneratedTestDto();
             alignedTest.setTitle("Official GATE Past Paper: " + topic + " (" + subject + ")");
-            alignedTest.setSubject(subject); // overall domain e.g. CSE
-            alignedTest.setTopic(topic);     // overall year e.g. 2019
+            alignedTest.setSubject(subject);
+            alignedTest.setTopic(topic);
             alignedTest.setDurationMinutes(180);
-            alignedTest.setQuestions(allQuestions);
+            alignedTest.setQuestions(uniqueQuestions);
 
-            // Save aligned test DTO inside Session for confirmation
-            session.setAttribute("alignedTestDraft", alignedTest);
-            redirectAttributes.addFlashAttribute("success", String.format("Successfully parsed and aligned the past paper! Extracted a total of %d questions across all PDF pages.", allQuestions.size()));
-            return "redirect:/admin/rag/review";
+            // Return draft JSON directly — client stores it in React state
+            return ResponseEntity.ok(alignedTest);
 
         } catch (Exception e) {
             log.error("Failed to parse and align past paper: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to parse document: " + e.getMessage());
-            return "redirect:/admin/rag";
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to parse document: " + e.getMessage()));
         }
     }
 
-    @GetMapping("/review")
-    public String reviewAlignedTest(HttpSession session, Model model, RedirectAttributes redirectAttributes) {
-        AiGeneratedTestDto draft = (AiGeneratedTestDto) session.getAttribute("alignedTestDraft");
-        if (draft == null) {
-            redirectAttributes.addFlashAttribute("error", "No parsed draft found in session.");
-            return "redirect:/admin/rag";
-        }
-        model.addAttribute("draft", draft);
-        return "admin/rag-review";
-    }
-
+    /**
+     * POST /api/admin/rag/confirm
+     * Accepts the aligned draft JSON from client, persists to DB and embeds to PGVector.
+     */
     @PostMapping("/confirm")
-    public String confirmIngestion(HttpSession session, RedirectAttributes redirectAttributes) {
-        AiGeneratedTestDto draft = (AiGeneratedTestDto) session.getAttribute("alignedTestDraft");
-        if (draft == null) {
-            redirectAttributes.addFlashAttribute("error", "Session draft expired. Please re-upload.");
-            return "redirect:/admin/rag";
+    public ResponseEntity<?> confirmIngestion(@RequestBody AiGeneratedTestDto draft) {
+        if (draft == null || draft.getQuestions() == null || draft.getQuestions().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Draft is empty or missing questions."));
         }
 
         try {
-            // Step 1: Persist questions relationally so students can take the exam
+            // Step 1: Persist questions relationally
             MockTest test = mockTestGenerationService.persistTest(draft);
-            
-            // Step 2: Convert to Spring AI documents and embed inside PGVector
+
+            // Step 2: Embed in PGVector
             List<Document> documents = new ArrayList<>();
             for (AiGeneratedQuestionDto q : draft.getQuestions()) {
                 String dynamicSubject = q.getSubject() != null && !q.getSubject().trim().isEmpty() ? q.getSubject() : draft.getSubject();
                 String dynamicTopic = q.getTopic() != null && !q.getTopic().trim().isEmpty() ? q.getTopic() : draft.getTopic();
 
                 String content = String.format(
-                    "Subject: %s | Topic: %s | Type: %s\nQuestion: %s\nExplanation: %s",
-                    dynamicSubject, dynamicTopic, q.getType(),
-                    q.getQuestionText(),
-                    q.getExplanation() != null ? q.getExplanation() : ""
+                        "Subject: %s | Topic: %s | Type: %s\nQuestion: %s\nExplanation: %s",
+                        dynamicSubject, dynamicTopic, q.getType(),
+                        q.getQuestionText(),
+                        q.getExplanation() != null ? q.getExplanation() : ""
                 );
 
                 java.util.Map<String, Object> metadata = java.util.Map.of(
-                    "id", "parsed_" + q.getSequenceNo() + "_" + System.currentTimeMillis(),
-                    "topic", dynamicTopic,
-                    "subject", dynamicSubject,
-                    "type", q.getType()
+                        "id", "parsed_" + q.getSequenceNo() + "_" + System.currentTimeMillis(),
+                        "topic", dynamicTopic,
+                        "subject", dynamicSubject,
+                        "type", q.getType()
                 );
                 documents.add(new Document(content, metadata));
             }
             ragIngestionService.ingestDocumentChunks(documents);
 
-            session.removeAttribute("alignedTestDraft");
-            redirectAttributes.addFlashAttribute("success", "Successfully committed official paper and populated its embeddings inside PGVector store!");
-            return "redirect:/admin/rag";
+            return ResponseEntity.ok(Map.of(
+                    "status", "success",
+                    "message", "Successfully committed " + draft.getQuestions().size() + " questions and populated PGVector embeddings!",
+                    "testId", test.getId().toString()
+            ));
 
         } catch (Exception e) {
             log.error("Failed to commit aligned paper to PGVector: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to ingest: " + e.getMessage());
-            return "redirect:/admin/rag";
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to ingest: " + e.getMessage()));
         }
     }
 
+    /**
+     * POST /api/admin/rag/test?query=...&topK=N
+     * Similarity search playground endpoint.
+     */
     @PostMapping("/test")
-    @ResponseBody
-    public List<Map<String, Object>> testSimilarityQuery(@RequestParam("query") String query, @RequestParam("topK") int topK) {
+    public List<Map<String, Object>> testSimilarityQuery(
+            @RequestParam("query") String query,
+            @RequestParam("topK") int topK) {
         log.info("Testing similarity query: '{}' topK: {}", query, topK);
         List<Document> matches = ragIngestionService.retrieveSimilarQuestions(query, topK);
         List<Map<String, Object>> results = new ArrayList<>();
-        
         for (Document doc : matches) {
-            Map<String, Object> map = Map.of(
-                "content", doc.getText(),
-                "metadata", doc.getMetadata()
-            );
-            results.add(map);
+            results.add(Map.of("content", doc.getText(), "metadata", doc.getMetadata()));
         }
         return results;
     }

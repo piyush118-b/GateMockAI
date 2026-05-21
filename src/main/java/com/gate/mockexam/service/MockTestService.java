@@ -2,6 +2,7 @@ package com.gate.mockexam.service;
 
 import com.gate.mockexam.dto.MockTestSummaryDto;
 import com.gate.mockexam.entity.MockTest;
+import com.gate.mockexam.repository.AttemptRepository;
 import com.gate.mockexam.repository.MockTestRepository;
 import org.springframework.stereotype.Service;
 import java.util.List;
@@ -12,9 +13,11 @@ import java.util.stream.Collectors;
 public class MockTestService {
 
     private final MockTestRepository mockTestRepository;
+    private final AttemptRepository attemptRepository;
 
-    public MockTestService(MockTestRepository mockTestRepository) {
+    public MockTestService(MockTestRepository mockTestRepository, AttemptRepository attemptRepository) {
         this.mockTestRepository = mockTestRepository;
+        this.attemptRepository = attemptRepository;
     }
 
     public List<MockTestSummaryDto> getAllPublishedTests() {
@@ -39,6 +42,22 @@ public class MockTestService {
                 .orElseThrow(() -> new IllegalArgumentException("Test not found: " + id));
         test.setPublished(true);
         mockTestRepository.save(test);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void unpublishTest(UUID id) {
+        MockTest test = mockTestRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Test not found: " + id));
+        test.setPublished(false);
+        mockTestRepository.save(test);
+    }
+
+    @org.springframework.transaction.annotation.Transactional
+    public void deleteTest(UUID id) {
+        MockTest test = mockTestRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Test not found: " + id));
+        attemptRepository.deleteByTestId(id);
+        mockTestRepository.delete(test);
     }
 
     private MockTestSummaryDto mapToSummary(MockTest test) {

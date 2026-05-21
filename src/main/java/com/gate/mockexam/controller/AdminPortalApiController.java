@@ -106,6 +106,36 @@ public class AdminPortalApiController {
         }
     }
 
+    @PostMapping("/tests/{id}/unpublish")
+    public ResponseEntity<?> unpublishTest(@PathVariable("id") UUID id, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        try {
+            mockTestService.unpublishTest(id);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Test unpublished successfully."));
+        } catch (Exception e) {
+            log.error("Failed to unpublish test via REST: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Unpublish failed: " + e.getMessage());
+        }
+    }
+
+    @DeleteMapping("/tests/{id}")
+    public ResponseEntity<?> deleteTest(@PathVariable("id") UUID id, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+
+        try {
+            mockTestService.deleteTest(id);
+            return ResponseEntity.ok(Map.of("status", "success", "message", "Test deleted successfully."));
+        } catch (Exception e) {
+            log.error("Failed to delete test via REST: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Delete failed: " + e.getMessage());
+        }
+    }
+
     @GetMapping("/rag/status")
     public ResponseEntity<?> getRagStatus(Principal principal) {
         if (principal == null) {

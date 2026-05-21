@@ -8,10 +8,12 @@ public class SpaViewController {
 
     @GetMapping({
         "/student/**",
-        "/admin/**"
+        "/admin/**",
+        "/login",
+        "/register"
     })
     public String forwardToSpa() {
-        // Forward to the static index.html served directly by Spring Boot
+        // Forward all SPA routes to the static index.html served by Spring Boot
         return "forward:/index.html";
     }
 }

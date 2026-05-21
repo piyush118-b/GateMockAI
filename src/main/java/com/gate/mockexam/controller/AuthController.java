@@ -5,16 +5,17 @@ import com.gate.mockexam.entity.User;
 import com.gate.mockexam.enums.UserRole;
 import com.gate.mockexam.repository.UserRepository;
 import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Controller;
-import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.annotation.*;
 
-@Controller
+import java.util.HashMap;
+import java.util.Map;
+
+@RestController
 public class AuthController {
 
     private final UserRepository userRepository;
@@ -25,38 +26,37 @@ public class AuthController {
         this.passwordEncoder = passwordEncoder;
     }
 
-    @GetMapping("/login")
-    public String login(Authentication authentication) {
-        if (authentication != null && authentication.isAuthenticated()) {
-            return "redirect:/home";
-        }
-        return "auth/login";
-    }
+    /**
+     * POST /api/register
+     * React SPA submits registration data as JSON, receives JSON error or success.
+     */
+    @PostMapping("/api/register")
+    public ResponseEntity<Map<String, Object>> registerUser(
+            @Valid @RequestBody UserRegistrationDto registrationDto,
+            BindingResult bindingResult) {
 
-    @GetMapping("/register")
-    public String showRegistrationForm(Model model, Authentication authentication) {
-        if (authentication != null && authentication.isAuthenticated()) {
-            return "redirect:/home";
-        }
-        model.addAttribute("userDto", new UserRegistrationDto());
-        return "auth/register";
-    }
+        Map<String, Object> response = new HashMap<>();
 
-    @PostMapping("/register")
-    public String registerUser(@Valid @ModelAttribute("userDto") UserRegistrationDto registrationDto,
-                               BindingResult bindingResult, Model model) {
         if (bindingResult.hasErrors()) {
-            return "auth/register";
+            Map<String, String> fieldErrors = new HashMap<>();
+            for (FieldError fe : bindingResult.getFieldErrors()) {
+                fieldErrors.put(fe.getField(), fe.getDefaultMessage());
+            }
+            response.put("status", "error");
+            response.put("fieldErrors", fieldErrors);
+            return ResponseEntity.badRequest().body(response);
         }
 
         if (!registrationDto.getPassword().equals(registrationDto.getConfirmPassword())) {
-            bindingResult.rejectValue("confirmPassword", "error.confirmPassword", "Passwords do not match");
-            return "auth/register";
+            response.put("status", "error");
+            response.put("fieldErrors", Map.of("confirmPassword", "Passwords do not match"));
+            return ResponseEntity.badRequest().body(response);
         }
 
         if (userRepository.existsByEmail(registrationDto.getEmail())) {
-            bindingResult.rejectValue("email", "error.email", "An account already exists with this email");
-            return "auth/register";
+            response.put("status", "error");
+            response.put("fieldErrors", Map.of("email", "An account already exists with this email"));
+            return ResponseEntity.badRequest().body(response);
         }
 
         User user = User.builder()
@@ -68,13 +68,19 @@ public class AuthController {
 
         userRepository.save(user);
 
-        return "redirect:/login?registered=true";
+        response.put("status", "success");
+        response.put("message", "Account created successfully. Please log in.");
+        return ResponseEntity.ok(response);
     }
 
+    /**
+     * GET /home — Server-side redirect logic based on authenticated role.
+     * Called by Spring Security's success handler redirect internally.
+     */
     @GetMapping("/home")
-    public String homeRedirect(Authentication authentication) {
-        if (authentication == null) {
-            return "redirect:/login";
+    public ResponseEntity<?> homeRedirect(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(302).header("Location", "/login").build();
         }
 
         boolean isAdmin = authentication.getAuthorities().stream()
@@ -82,12 +88,7 @@ public class AuthController {
         boolean isStudent = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_STUDENT"));
 
-        if (isAdmin) {
-            return "redirect:/admin/dashboard";
-        } else if (isStudent) {
-            return "redirect:/student/tests";
-        }
-
-        return "redirect:/login";
+        String redirectPath = isAdmin ? "/admin/dashboard" : isStudent ? "/student/tests" : "/login";
+        return ResponseEntity.status(302).header("Location", redirectPath).build();
     }
 }

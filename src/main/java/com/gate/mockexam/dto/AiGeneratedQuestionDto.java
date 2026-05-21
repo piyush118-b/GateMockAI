@@ -13,6 +13,7 @@ import java.io.IOException;
 @Data
 public class AiGeneratedQuestionDto {
     private int sequenceNo;
+    private String section;         // "GA", "CS"
     private String type;            // "MCQ", "MSQ", "NAT"
     private String questionText;
     private double marks;

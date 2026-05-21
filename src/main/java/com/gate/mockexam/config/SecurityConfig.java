@@ -9,7 +9,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
@@ -24,16 +25,33 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        // Use cookie-based CSRF so the React SPA can read XSRF-TOKEN cookie
+        // and include it in POST requests.
         http
-            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+            .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/login", "/register", "/css/**", "/js/**", "/uploads/**", "/assets/**", "/index.html", "/vite.svg").permitAll()
+                // Static SPA assets — always public
+                .requestMatchers(
+                    "/login", "/register",
+                    "/css/**", "/js/**",
+                    "/uploads/**", "/assets/**",
+                    "/index.html", "/vite.svg", "/favicon.svg", "/icons.svg"
+                ).permitAll()
+                // Public REST endpoints
+                .requestMatchers("/api/register").permitAll()
+                // Admin routes
                 .requestMatchers("/api/admin/**", "/admin/**").hasRole("ADMIN")
-                .requestMatchers("/api/exam/**", "/api/student/**", "/student/**", "/exam/**", "/dashboard/**", "/results/**").hasRole("STUDENT")
+                // Student routes
+                .requestMatchers(
+                    "/api/exam/**", "/api/student/**",
+                    "/student/**", "/exam/**", "/dashboard/**", "/results/**"
+                ).hasRole("STUDENT")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
                 .loginPage("/login")
+                .usernameParameter("username")
+                .passwordParameter("password")
                 .successHandler(customSuccessHandler())
                 .failureUrl("/login?error=true")
                 .permitAll()

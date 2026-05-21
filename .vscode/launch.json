@@ -1,0 +1,51 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    // ─────────────────────────────────────────────────────────────────
+    // SPRING BOOT – Debug Mode via Maven
+    // Run this to start the full backend with hot-reload (DevTools)
+    // Pre-requisite: Docker must be running (DB container must be up)
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "type": "java",
+      "name": "🚀 Run Spring Boot (Debug)",
+      "request": "launch",
+      "mainClass": "com.gate.mockexam.GateMockExamApplication",
+      "projectName": "gate-mock-exam",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "vmArgs": "-Dspring.profiles.active=default",
+      "args": [],
+      "preLaunchTask": "⚡ Build Frontend (Vite)"
+    },
+
+    // ─────────────────────────────────────────────────────────────────
+    // SPRING BOOT – Quick Start (No frontend rebuild)
+    // Use when frontend is already built; faster restart for backend only
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "type": "java",
+      "name": "⚡ Run Spring Boot (Quick – No frontend build)",
+      "request": "launch",
+      "mainClass": "com.gate.mockexam.GateMockExamApplication",
+      "projectName": "gate-mock-exam",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "vmArgs": "-Dspring.profiles.active=default"
+    }
+  ],
+
+  "compounds": [
+    // ─────────────────────────────────────────────────────────────────
+    // 🔥 FULL STACK – Run everything together
+    // Starts the Spring Boot server + Frontend file watcher simultaneously
+    // ─────────────────────────────────────────────────────────────────
+    {
+      "name": "🔥 Full Stack (Spring Boot + Vite Watch)",
+      "configurations": [
+        "🚀 Run Spring Boot (Debug)"
+      ],
+      "preLaunchTask": "👀 Watch Frontend (Vite Dev)"
+    }
+  ]
+}
