@@ -16,6 +16,16 @@ public class RagIngestionServiceTest {
     @Autowired
     private RagIngestionService ragIngestionService;
 
+    // TRACK 2+3: new deps introduced in RagIngestionService — mock so context loads without live infra
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.ai.embedding.EmbeddingModel embeddingModel;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.ai.chat.client.ChatClient chatClient;
+
     @Test
     public void testIngestAndRetrieveSimilarQuestions() throws Exception {
         // Ensure that at least some questions are ingested into the store

@@ -15,18 +15,26 @@ export default function StudentTestsList() {
   useEffect(() => {
     fetch('/api/student/tests')
       .then(res => {
+        if (res.status === 401) {
+          navigate('/login');
+          return null;
+        }
         if (!res.ok) throw new Error('Failed to load mock exams.');
         return res.json();
       })
       .then(json => {
-        setTests(json);
-        setLoading(false);
+        if (json) {
+          setTests(json);
+          setLoading(false);
+        }
       })
       .catch(err => {
-        setError(err.message);
+        if (err.message) {
+          setError(err.message);
+        }
         setLoading(false);
       });
-  }, []);
+  }, [navigate]);
 
   const handleLaunchClick = (test) => {
     setSelectedTest(test);

@@ -1,31 +1,20 @@
-# GATE MockAI 🎓
-### AI-Powered Academic Assessment & Smart RAG Mock Exam Platform
+# GATE MockAI: System Architecture & RAG Pipeline Deep-Dive
 
-Welcome to **GATE MockAI**, a production-grade, AI-aligned assessment platform built to ingest, draft, manage, and simulate syllabus-aligned GATE (Graduate Aptitude Test in Engineering) Mock Exams. By combining a split-architecture **React Single Page Application (SPA)** with a **Spring Boot REST API** and a **Retrieval-Augmented Generation (RAG)** pipeline powered by local LLMs (via Ollama), the system provides an end-to-end sandbox for creating, indexing, and emulating high-fidelity, NTA-style examinations.
-
----
-
-## 🚀 Key Features
-
-* **High-Fidelity NTA Emulation**: A faithful replica of the National Testing Agency (NTA) exam console, complete with interactive question palettes, virtual calculator, section navigation (General Aptitude & Computer Science), countdown timers, and strict submission rules.
-* **Semantic RAG Ingestion Pipeline**: Ingests official GATE past papers from PDFs using a **3-page overlapping chunking window** to ensure questions spanning page boundaries are captured without truncation.
-* **Advanced Answer Key Parser**: A Java-based regex parser that extracts answers, scoring models, and tolerances from official keys, linking options and NAT values programmatically.
-* **Semantic Search Generation**: Similarity search powered by local vector embedding maps the admin's syllabus configuration to database context, grounding LLM exam generation in real historical questions.
-* **Persistent Session Store**: Spring Session backed by JDBC (PostgreSQL) preserves administrator and student login sessions across application restarts or rebuilds.
+This document provides a comprehensive, technical walkthrough of the GATE MockAI platform. It covers the overall application architecture, database schemas, frontend-backend communications, and details how the Retrieval-Augmented Generation (RAG) extraction and mock test generation engine works.
 
 ---
 
-## 🏗️ System Architecture
+## 1. System Architecture Overview
 
-GATE MockAI is built as a split-architecture Web application utilizing a modern single-page React frontend, a Spring Boot backend API, a PostgreSQL database (supporting `pgvector` for embeddings), and a local Ollama AI engine.
+GATE MockAI is built as a split-architecture Web application utilizing a modern single-page React frontend, a Spring Boot backend REST API, a PostgreSQL database (supporting `pgvector` for embeddings), and a local Ollama AI engine.
 
-### Visual Architecture Diagram
-Below is the system architecture showing how each tier functions and interfaces with the next:
+### System Architecture Flow Diagram
+The visual diagram below demonstrates the interaction between the React Client Tier, Spring Boot Service Tier, PostgreSQL Storage Tier, and Local Ollama Inference Tier:
 
 ![System Architecture](file:///Users/piyush_18/Desktop/Projects/Java_SpringBoot_Project/GateMockAI/docs/images/system_architecture.png)
 
-### Architecture Schema (Mermaid Layout)
-For programmatic reference and rendering in Markdown viewers:
+### Architecture Layout (Mermaid Model)
+For rendering directly in Markdown engines:
 
 ```mermaid
 graph TD
@@ -78,16 +67,16 @@ graph TD
 
 ---
 
-## 📊 Database Schema & Relationships
+## 2. In-Depth Database Schema & Relationships
 
 The database is built on PostgreSQL, schema migrations are version-controlled with Flyway, and session states are persisted to prevent administrative timeouts during local AI inference.
 
-### Core Schema ERD
-The entity-relationship diagram below maps all active tables, primary keys, foreign keys, and fields:
+### Core Database Schema ERD
+The following diagram illustrates table definitions, properties, and entity relationships:
 
 ![Database Schema](file:///Users/piyush_18/Desktop/Projects/Java_SpringBoot_Project/GateMockAI/docs/images/database_schema.png)
 
-### Schema Code (Mermaid Format)
+### Database Schema (Mermaid Layout)
 
 ```mermaid
 erDiagram
@@ -180,11 +169,11 @@ erDiagram
     branches ||--o{ branch_subjects : "defines subjects for"
 ```
 
-### Table Definitions & Purposes
+### Table Definitions & Purpose
 
 1. **`users`**: Registers user profiles and segregates privileges using role flags (`ROLE_ADMIN` vs. `ROLE_STUDENT`).
 2. **`mock_tests`**: Serves as the parent metadata container for an exam session, linking its topic, duration, publishing state, and total compiled marks.
-3. **`questions`**: Stores the questions. Supports Multiple Choice (`MCQ`), Multiple Select (`MSQ`), or Numerical Answer Type (`NAT`). Stores grading criteria (`marks`, `negative_marks`), correctness ranges (`correct_nat_value` and `nat_tolerance` for NATs), and detailed explanations.
+3. **`questions`**: Stores the questions. Supports Multiple Choice (`MCQ`), Multiple Select (`MSQ`), or Numerical Answer Type (`NAT`). Stores grading criteria (`marks`, `negative_marks`), correctness ranges (`correct_nat_value` and `nat_tolerance` for NATs), and detailed academic explanations.
 4. **`options`**: Holds individual options for `MCQ` and `MSQ` questions, using standard labels (A, B, C, D) and a boolean `is_correct` indicator.
 5. **`attempts` & `attempt_answers`**: Persists student actions during exam attempts. Tracks live state (answered options, entered numerical values), evaluates responses instantly upon submission, and awards marks based on paper negative marking matrices.
 6. **`branches` & `branch_subjects`**: Domain catalog listing branches (e.g., CSE) and corresponding syllabus subjects. Used by generator modules to dynamically distribute subject weightages.
@@ -196,7 +185,7 @@ erDiagram
 
 ---
 
-## 🧠 How RAG Works
+## 3. How RAG works on GATE MockAI
 
 The Retrieval-Augmented Generation (RAG) implementation consists of two core procedures: **Ingestion & Alignment** (parsing past papers into the vector database) and **Generation** (retrieving relevant context to compile new exams).
 
@@ -312,7 +301,7 @@ sequenceDiagram
 
 ---
 
-## 🔑 Session & Security Configuration
+## 4. Session & Security Configuration
 
 The platform implements persistent, stateful authentication using Spring Security and JDBC Spring Session.
 
@@ -326,63 +315,3 @@ The platform implements persistent, stateful authentication using Spring Securit
   - `/api/admin/**` and `/admin/**` endpoints are protected under the `ADMIN` role.
   - `/api/exam/**`, `/api/student/**`, `/student/**`, and `/exam/**` are protected under the `STUDENT` role.
   - Form logins route users to their respective dashboards based on their role (`customSuccessHandler`).
-
----
-
-## 🛠️ Technology Stack
-
-* **Frontend**: React (Vite, React Router, TailwindCSS `@import`)
-* **Backend**: Spring Boot 3.3.4 (Java 17/25)
-* **AI Core**: Spring AI 1.1.1
-* **LLM Engine**: Ollama (Local Server)
-  - Text Model: `qwen2.5-coder:7b` (used for transcription and generation)
-  - Embedding Model: `nomic-embed-text` (768 Dimensions, used for semantic vector database indexing)
-* **Database**: PostgreSQL 16 + PGVector Extension
-* **Migrations**: Flyway Schema Migrations
-* **Sessions**: Spring Session JDBC (PostgreSQL Persistent Store)
-* **Security**: Spring Security 6 (Persistent cookies, Role-based routing, BCrypt password hashing)
-
----
-
-## ⚙️ Quick Start
-
-### 1. Prerequisites
-* **Java**: JDK 17 or higher
-* **Node.js**: v18+ & npm
-* **Docker**: Docker Desktop (for PostgreSQL database container)
-* **Ollama**: Installed and running on host/container port `11434`
-  ```bash
-  # Pull the configured models
-  ollama pull qwen2.5-coder:7b
-  ollama pull nomic-embed-text
-  ```
-
-### 2. Spin up Database and Vector Container
-Start the PostgreSQL container on port `5439` using Docker Compose:
-```bash
-docker compose up -d
-```
-
-### 3. Boot Up the Backend
-Run the Spring Boot application (will auto-apply Flyway migrations and prepare vector table schemas):
-```bash
-mvn clean compile spring-boot:run
-```
-
-### 4. Boot Up the Frontend Dev Server
-Navigate into the `frontend` directory, install dependencies, and launch Vite:
-```bash
-cd frontend
-# Install package dependencies
-npm install
-# Boot dev server
-npm run dev
-```
-
-The application is now accessible at **[http://localhost:5173](http://localhost:5173)**.
-
----
-
-## 🔑 Default Credentials
-* **Admin Account**: `admin@gate.com` / `Admin@123`
-* **Student Account**: Register a new student account using the signup form (`/register`).

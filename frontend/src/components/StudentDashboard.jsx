@@ -1,27 +1,36 @@
 import React, { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { GraduationCap, History, PlayCircle, Trophy, BarChart3, LogOut, Loader2 } from 'lucide-react'
 
 export default function StudentDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetch('/api/student/dashboard')
       .then(res => {
+        if (res.status === 401) {
+          navigate('/login');
+          return null;
+        }
         if (!res.ok) throw new Error('Failed to fetch dashboard data.');
         return res.json();
       })
       .then(json => {
-        setData(json);
-        setLoading(false);
+        if (json) {
+          setData(json);
+          setLoading(false);
+        }
       })
       .catch(err => {
-        setError(err.message);
+        if (err.message) {
+          setError(err.message);
+        }
         setLoading(false);
       });
-  }, []);
+  }, [navigate]);
 
   if (loading) {
     return (

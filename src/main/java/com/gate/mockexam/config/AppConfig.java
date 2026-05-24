@@ -9,6 +9,9 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @Configuration
 public class AppConfig {
 
@@ -27,6 +30,16 @@ public class AppConfig {
             .baseUrl(ollamaBaseUrl)
             .restClientBuilder(customizedBuilder)
             .build();
+    }
+
+    /**
+     * Fixed thread pool for parallel Ollama chunk calls.
+     * Size of 3 matches the Semaphore permit count in AdminRagController —
+     * prevents VRAM OOM while still cutting ingestion time ~3x.
+     */
+    @Bean(name = "ollamaChunkExecutor", destroyMethod = "shutdown")
+    public ExecutorService ollamaChunkExecutor() {
+        return Executors.newFixedThreadPool(3);
     }
 
     @Bean

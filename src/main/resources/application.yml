@@ -1,4 +1,9 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.session.RedisSessionAutoConfiguration
   servlet:
     multipart:
       max-file-size: 50MB
@@ -25,7 +30,7 @@ spring:
         table-name: gate_vector_store
         initialize-schema: true
   datasource:
-    url: jdbc:postgresql://localhost:5439/gate_db
+    url: jdbc:postgresql://localhost:5432/gate_db
     username: gate_user
     password: gate_pass
     driver-class-name: org.postgresql.Driver
@@ -63,3 +68,8 @@ gate:
     vector-store-path: ./data/vector-store.json
     seed-questions-path: classpath:rag/seed_questions.json
     auto-ingest-on-startup: true
+
+# TRACK 3: HyDE + Multi-query fusion toggle.
+# Set to false to fall back to bare single-topic cosine search.
+hyde:
+  enabled: true

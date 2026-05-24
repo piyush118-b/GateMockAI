@@ -2,6 +2,7 @@ package com.gate.mockexam.controller;
 
 import com.gate.mockexam.entity.*;
 import com.gate.mockexam.repository.*;
+import com.gate.mockexam.service.AnalyticsService;
 import com.gate.mockexam.service.MockTestService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,7 @@ public class StudentPortalApiController {
     private final AttemptAnswerRepository attemptAnswerRepository;
     private final QuestionRepository questionRepository;
     private final MockTestService mockTestService;
+    private final AnalyticsService analyticsService;
 
     public StudentPortalApiController(
             UserRepository userRepository,
@@ -29,13 +31,15 @@ public class StudentPortalApiController {
             AttemptRepository attemptRepository,
             AttemptAnswerRepository attemptAnswerRepository,
             QuestionRepository questionRepository,
-            MockTestService mockTestService) {
+            MockTestService mockTestService,
+            AnalyticsService analyticsService) {
         this.userRepository = userRepository;
         this.mockTestRepository = mockTestRepository;
         this.attemptRepository = attemptRepository;
         this.attemptAnswerRepository = attemptAnswerRepository;
         this.questionRepository = questionRepository;
         this.mockTestService = mockTestService;
+        this.analyticsService = analyticsService;
     }
 
     @GetMapping("/dashboard")
@@ -226,6 +230,39 @@ public class StudentPortalApiController {
         } catch (Exception e) {
             log.error("Failed to load attempt result scorecard: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Error loading scorecard: " + e.getMessage());
+        }
+    }
+
+    // ── GET /api/student/attempts/{attemptId}/analytics ───────────────────────
+    /**
+     * TRACK 4: Rich post-submission analytics for a single attempt.
+     * Returns score, accuracy, time taken, bySubject chart data, byType breakdown,
+     * and the top-10 weakest questions (wrong, sorted by marks descending).
+     */
+    @GetMapping("/attempts/{attemptId}/analytics")
+    public ResponseEntity<?> getAttemptAnalytics(
+            @PathVariable("attemptId") UUID attemptId,
+            java.security.Principal principal) {
+
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        try {
+            // Ownership check: student can only view their own analytics
+            Attempt attempt = attemptRepository.findById(attemptId)
+                    .orElseThrow(() -> new IllegalArgumentException("Attempt not found."));
+            User user = userRepository.findByEmail(principal.getName())
+                    .orElseThrow(() -> new IllegalArgumentException("User not found."));
+            if (!attempt.getUser().getId().equals(user.getId())) {
+                return ResponseEntity.status(403).body("Access Denied: unauthorized attempt lookup.");
+            }
+
+            return ResponseEntity.ok(analyticsService.getAttemptAnalytics(attemptId));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(404).body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Failed to load attempt analytics: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Error loading analytics: " + e.getMessage());
         }
     }
 }

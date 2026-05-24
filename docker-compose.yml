@@ -21,5 +21,28 @@ services:
       - ./ollama_data:/root/.ollama
     restart: unless-stopped
 
+  # TRACK 6: Redis session store — activate Spring profile 'redis' to use this.
+  # AOF persistence ensures sessions survive container restarts.
+  # Start only this service: docker compose up -d redis
+  redis:
+    image: redis:7-alpine
+    container_name: gate_redis
+    command: >
+      redis-server
+      --appendonly yes
+      --appendfsync everysec
+      --loglevel notice
+    ports:
+      - "6379:6379"
+    volumes:
+      - gate_redis_data:/data
+    restart: unless-stopped
+    environment:
+      # Expose host/port so the Spring app can read them if needed
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
 volumes:
   gate_pgdata:
+  # Named volume for Redis AOF data — persists across container recreations
+  gate_redis_data:

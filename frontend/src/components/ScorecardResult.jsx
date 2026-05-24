@@ -87,6 +87,14 @@ export default function ScorecardResult() {
           </Link>
           <span className="font-extrabold text-sm uppercase tracking-wider text-gray-100">Exam Performance Scorecard</span>
         </div>
+        {/* TRACK 4: Link to detailed analytics panel */}
+        <Link
+          to={`/student/attempts/${attemptId}/analytics`}
+          className="flex items-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase tracking-wider px-4 py-2 rounded-[6px] transition-colors"
+        >
+          <BarChart3 className="w-4 h-4" />
+          <span>Deep Analytics</span>
+        </Link>
       </nav>
 
       {/* DASHBOARD CONTAINER */}

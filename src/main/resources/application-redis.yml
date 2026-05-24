@@ -1,0 +1,23 @@
+# TRACK 6: Redis Session Profile
+# Activate with: --spring.profiles.active=redis
+# or set SPRING_PROFILES_ACTIVE=redis in environment.
+#
+# This profile overrides spring.session.store-type to redis.
+# The SPRING_SESSION table (created by Flyway V1) remains in the database unused.
+# SessionConfig cookie serializer (Max-Age=30d, SameSite=Lax) is unchanged.
+# CSRF: SecurityConfig uses csrf.disable(), so no CSRF token repository changes needed.
+
+spring:
+  autoconfigure:
+    exclude: []
+  session:
+    store-type: redis
+    redis:
+      flush-mode: on_save       # write session to Redis only when dirty
+      namespace: "gate:session" # key prefix in Redis
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      # password: ${REDIS_PASSWORD:}   # uncomment and set if your Redis requires auth

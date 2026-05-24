@@ -24,6 +24,11 @@ export default defineConfig({
         target: 'http://localhost:8085',
         changeOrigin: true,
         secure: false,
+        bypass: (req) => {
+          if (req.method === 'GET') {
+            return '/index.html';
+          }
+        }
       },
       '/logout': {
         target: 'http://localhost:8085',

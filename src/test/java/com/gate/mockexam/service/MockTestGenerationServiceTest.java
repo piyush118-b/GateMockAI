@@ -30,6 +30,13 @@ public class MockTestGenerationServiceTest {
     @MockBean
     private ChatClient chatClient;
 
+    // TRACK 2+3: new deps in RagIngestionService — mock to avoid needing live DB/Ollama
+    @MockBean
+    private org.springframework.ai.embedding.EmbeddingModel embeddingModel;
+
+    @MockBean
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
     @org.springframework.boot.test.mock.mockito.SpyBean
     private com.gate.mockexam.repository.MockTestRepository mockTestRepository;
 

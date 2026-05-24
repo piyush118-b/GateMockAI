@@ -12,6 +12,7 @@ import NtaLogin from './components/NtaLogin'
 import NtaInstructions from './components/NtaInstructions'
 import ExamConsole from './components/ExamConsole'
 import ScorecardResult from './components/ScorecardResult'
+import AttemptAnalytics from './components/AttemptAnalytics'
 
 // Admin Portal
 import AdminDashboard from './components/AdminDashboard'
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="/student/tests/:testId/instructions" element={<NtaInstructions />} />
         <Route path="/student/tests/:testId/take" element={<ExamConsole />} />
         <Route path="/student/attempts/:attemptId/result" element={<ScorecardResult />} />
+        <Route path="/student/attempts/:attemptId/analytics" element={<AttemptAnalytics />} />
 
         {/* ─── ADMIN PORTAL ─── */}
         <Route path="/admin/dashboard" element={<AdminDashboard />} />
