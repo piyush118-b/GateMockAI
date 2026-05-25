@@ -111,8 +111,8 @@ public class AdminRagController {
             if (Objects.requireNonNull(file.getOriginalFilename()).endsWith(".pdf")) {
                 List<String> pages = documentParserService.parsePdfPages(file.getBytes());
                 log.info("Total PDF pages: {}", pages.size());
-                int step = 2;
-                int chunkSize = 3;
+                int step = 1;
+                int chunkSize = 2;
                 for (int startPage = 0; startPage < pages.size(); startPage += step) {
                     StringBuilder currentChunk = new StringBuilder();
                     int endPage = Math.min(startPage + chunkSize, pages.size());

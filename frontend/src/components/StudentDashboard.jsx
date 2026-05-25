@@ -11,7 +11,7 @@ export default function StudentDashboard() {
   useEffect(() => {
     fetch('/api/student/dashboard')
       .then(res => {
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 403) {
           navigate('/login');
           return null;
         }

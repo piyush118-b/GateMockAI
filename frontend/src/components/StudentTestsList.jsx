@@ -15,7 +15,7 @@ export default function StudentTestsList() {
   useEffect(() => {
     fetch('/api/student/tests')
       .then(res => {
-        if (res.status === 401) {
+        if (res.status === 401 || res.status === 403) {
           navigate('/login');
           return null;
         }
