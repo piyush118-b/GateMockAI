@@ -135,12 +135,20 @@ export default function AdminDashboard() {
           <span className="font-extrabold text-sm uppercase tracking-wider text-gray-100">GATE MockAI — Control Center</span>
         </div>
 
-        <a 
-          href="/logout"
-          className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
-        >
-          Sign Out
-        </a>
+        <div className="flex items-center gap-6">
+          <Link 
+            to="/admin/analytics"
+            className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
+          >
+            Analytics Dashboard
+          </Link>
+          <a 
+            href="/logout"
+            className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
+          >
+            Sign Out
+          </a>
+        </div>
       </nav>
 
       {/* DASHBOARD BODY */}

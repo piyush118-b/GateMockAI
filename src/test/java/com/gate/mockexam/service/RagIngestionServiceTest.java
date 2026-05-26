@@ -24,10 +24,19 @@ public class RagIngestionServiceTest {
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
     @org.springframework.boot.test.mock.mockito.MockBean
-    private org.springframework.ai.chat.client.ChatClient chatClient;
+    private com.gate.mockexam.service.GeminiService geminiService;
+
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.ai.vectorstore.VectorStore vectorStore;
 
     @Test
     public void testIngestAndRetrieveSimilarQuestions() throws Exception {
+        List<Document> mockDocs = List.of(
+            new Document("Subject: Operating Systems | Topic: Paging\nQuestion: Page replacement policies...", java.util.Map.of("subject", "Operating Systems"))
+        );
+        org.mockito.Mockito.when(vectorStore.similaritySearch(org.mockito.Mockito.any(org.springframework.ai.vectorstore.SearchRequest.class)))
+                .thenReturn(mockDocs);
+
         // Ensure that at least some questions are ingested into the store
         int count = ragIngestionService.getVectorCount();
         if (count == 0) {

@@ -12,7 +12,7 @@ import com.gate.mockexam.repository.QuestionRepository;
 import com.gate.mockexam.repository.OptionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
+import com.gate.mockexam.service.GeminiService;
 import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
@@ -31,7 +31,7 @@ import java.util.stream.IntStream;
 @RequiredArgsConstructor
 public class MockTestGenerationService {
 
-    private final ChatClient chatClient;
+    private final GeminiService geminiService;
     private final RagIngestionService ragIngestionService;
     private final ObjectMapper objectMapper;
     private final MockTestRepository mockTestRepository;
@@ -86,10 +86,7 @@ public class MockTestGenerationService {
             .replace("{msqCount}", String.valueOf(request.getMsqCount()))
             .replace("{natCount}", String.valueOf(request.getNatCount()));
 
-        String rawJson = chatClient.prompt()
-            .user(renderedPrompt)
-            .call()
-            .content();
+        String rawJson = geminiService.generateJsonContent(renderedPrompt);
 
         log.debug("Raw Gemini response: {}", rawJson);
 
@@ -228,10 +225,7 @@ public class MockTestGenerationService {
                     .replace("{contextQuestions}", contextQuestions);
 
                 // Call Gemini LLM
-                String rawJson = chatClient.prompt()
-                    .user(prompt)
-                    .call()
-                    .content();
+                String rawJson = geminiService.generateJsonContent(prompt);
 
                 String cleaned = rawJson.trim()
                     .replaceAll("^```json\\s*", "")
@@ -366,7 +360,7 @@ public class MockTestGenerationService {
                     .replace("{contextCount}", String.valueOf(contextDocs.size()))
                     .replace("{contextQuestions}", contextQuestions);
 
-                String rawJson = chatClient.prompt().user(prompt).call().content();
+                String rawJson = geminiService.generateJsonContent(prompt);
                 String cleaned = rawJson.trim()
                     .replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```$", "").trim();
 

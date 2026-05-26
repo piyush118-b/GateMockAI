@@ -4,6 +4,7 @@ spring:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
       - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.session.RedisSessionAutoConfiguration
+      - org.springframework.ai.model.google.genai.autoconfigure.chat.GoogleGenAiChatAutoConfiguration
   servlet:
     multipart:
       max-file-size: 50MB
@@ -73,3 +74,10 @@ gate:
 # Set to false to fall back to bare single-topic cosine search.
 hyde:
   enabled: true
+
+gemini:
+  api:
+    key: ${GEMINI_API_KEY}
+  model:
+    transcription: gemini-2.5-flash
+    generation: gemini-2.5-flash

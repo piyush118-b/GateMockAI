@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Link } from 'react-router-dom'
 
 // Auth
 import Login from './components/Login'
@@ -21,6 +21,7 @@ import AdminTestEdit from './components/AdminTestEdit'
 import AdminTestExport from './components/AdminTestExport'
 import WeightedGenerator from './components/WeightedGenerator'
 import SseProgressCompiler from './components/SseProgressCompiler'
+import AdminAnalytics from './components/AdminAnalytics'
 
 export default function App() {
   return (
@@ -48,6 +49,26 @@ export default function App() {
         <Route path="/admin/tests/:testId/export" element={<AdminTestExport />} />
         <Route path="/admin/weighted-generator" element={<WeightedGenerator />} />
         <Route path="/admin/generate/progress" element={<SseProgressCompiler />} />
+        <Route path="/admin/analytics" element={<AdminAnalytics />} />
+        <Route path="/admin/analytics/test/:testId" element={
+          <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 text-center font-sans">
+            <div className="bg-white border border-gray-200 rounded-lg p-6 max-w-sm shadow-sm">
+              <h3 className="text-gray-800 font-extrabold uppercase text-xs">Mock Test In-depth Analytics</h3>
+              <p className="text-xs text-gray-500 mt-2">
+                Detailed question-level analysis and response statistics for test UUID:
+              </p>
+              <p className="text-[10px] text-indigo-600 font-mono mt-1 select-all break-all bg-indigo-50 p-2 rounded border border-indigo-100">
+                {window.location.pathname.split('/').pop()}
+              </p>
+              <Link 
+                to="/admin/analytics" 
+                className="mt-5 inline-flex items-center gap-1 text-[10px] font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded uppercase tracking-wider transition-all duration-150"
+              >
+                Back to Analytics
+              </Link>
+            </div>
+          </div>
+        } />
 
         {/* ─── FALLBACK ─── */}
         <Route path="*" element={<Navigate to="/student/tests" replace />} />

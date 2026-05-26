@@ -1,7 +1,6 @@
 package com.gate.mockexam.config;
 
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.model.ChatModel;
+
 import org.springframework.ai.ollama.api.OllamaApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -42,14 +41,5 @@ public class AppConfig {
         return Executors.newFixedThreadPool(3);
     }
 
-    @Bean
-    public ChatClient chatClient(ChatModel chatModel) {
-        return ChatClient.builder(chatModel)
-            .defaultSystem("""
-                You are an expert GATE (Graduate Aptitude Test in Engineering) question setter with 15 years of experience.
-                You create mathematically rigorous, conceptually deep questions that perfectly match GATE exam patterns.
-                You ALWAYS respond with raw JSON only. No markdown. No explanation. No preamble.
-                """)
-            .build();
-    }
+
 }

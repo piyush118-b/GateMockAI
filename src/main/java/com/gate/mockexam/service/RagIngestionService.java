@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gate.mockexam.dto.SeedQuestion;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.ai.chat.client.ChatClient;
+import com.gate.mockexam.service.GeminiService;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.embedding.EmbeddingModel;
 import org.springframework.ai.vectorstore.SearchRequest;
@@ -26,7 +26,7 @@ public class RagIngestionService {
 
     private final VectorStore vectorStore;
     private final ObjectMapper objectMapper;
-    private final ChatClient chatClient;
+    private final GeminiService geminiService;
     private final EmbeddingModel embeddingModel;
     private final JdbcTemplate jdbcTemplate;
 
@@ -202,7 +202,7 @@ public class RagIngestionService {
                 "Include the question stem and four plausible answer options (A, B, C, D). " +
                 "Return only the question text and options, no explanation.",
                 topic);
-            String response = chatClient.prompt().user(prompt).call().content();
+            String response = geminiService.generateContent(prompt);
             return response != null && !response.isBlank() ? response.trim() : topic;
         } catch (Exception e) {
             log.warn("HyDE query generation failed for topic '{}': {} — using raw topic", topic, e.getMessage());
@@ -220,7 +220,7 @@ public class RagIngestionService {
                 "Generate exactly 3 different paraphrases of this GATE exam topic for a semantic search query. " +
                 "Output each paraphrase on its own line, no numbering, no explanation: %s",
                 topic);
-            String response = chatClient.prompt().user(prompt).call().content();
+            String response = geminiService.generateContent(prompt);
             if (response == null || response.isBlank()) return List.of(topic);
 
             List<String> lines = Arrays.stream(response.split("\\r?\\n"))

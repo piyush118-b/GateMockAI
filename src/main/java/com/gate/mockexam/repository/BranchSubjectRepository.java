@@ -10,4 +10,7 @@ import java.util.UUID;
 @Repository
 public interface BranchSubjectRepository extends JpaRepository<BranchSubject, UUID> {
     List<BranchSubject> findByBranchIdAndIsActiveTrueOrderByDisplayOrderAsc(UUID branchId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT bs.name FROM BranchSubject bs WHERE bs.isActive = true")
+    List<String> findAllActiveSubjectNames();
 }

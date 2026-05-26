@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.ai.chat.client.ChatClient;
+import com.gate.mockexam.service.GeminiService;
 
 import java.math.BigDecimal;
 
@@ -28,7 +28,7 @@ public class MockTestGenerationServiceTest {
     private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @MockBean
-    private ChatClient chatClient;
+    private GeminiService geminiService;
 
     // TRACK 2+3: new deps in RagIngestionService — mock to avoid needing live DB/Ollama
     @MockBean
@@ -42,16 +42,7 @@ public class MockTestGenerationServiceTest {
 
     @Test
     public void testGenerateAndSaveTestSuccess() {
-        // Mock ChatClient fluent builder calls
-        ChatClient.ChatClientRequestSpec requestSpec = mock(ChatClient.ChatClientRequestSpec.class);
-        ChatClient.CallResponseSpec responseSpec = mock(ChatClient.CallResponseSpec.class);
-
         when(mockTestRepository.countByCreatedAtAfter(any())).thenReturn(0L);
-
-        when(chatClient.prompt()).thenReturn(requestSpec);
-        when(requestSpec.user(any(java.util.function.Consumer.class))).thenReturn(requestSpec);
-        when(requestSpec.user(any(String.class))).thenReturn(requestSpec);
-        when(requestSpec.call()).thenReturn(responseSpec);
         
         String mockJson = """
             {
@@ -102,7 +93,7 @@ public class MockTestGenerationServiceTest {
             }
             """;
         
-        when(responseSpec.content()).thenReturn(mockJson);
+        when(geminiService.generateJsonContent(any(String.class))).thenReturn(mockJson);
 
         // Prepare request DTO
         MockTestGenerationRequestDto request = new MockTestGenerationRequestDto();

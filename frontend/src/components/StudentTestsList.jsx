@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { PlayCircle, ShieldCheck, Clock, FileText, Award, ChevronLeft, Loader2 } from 'lucide-react'
+import { PlayCircle, ShieldCheck, Clock, FileText, Award, ChevronLeft, Loader2, LogOut } from 'lucide-react'
 
 export default function StudentTestsList() {
   const [tests, setTests] = useState([]);
@@ -96,13 +96,28 @@ export default function StudentTestsList() {
       {/* NAVBAR */}
       <nav className="bg-slate-900 text-white h-[64px] px-8 flex justify-between items-center shadow-md">
         <div className="flex items-center gap-2.5">
-          <Link 
-            to="/student/dashboard"
-            className="hover:bg-white/10 p-1.5 rounded-full text-gray-400 hover:text-white transition-colors mr-1"
-          >
-            <ChevronLeft className="w-5 h-5" />
+          <div className="bg-blue-600 w-9 h-9 rounded-md flex items-center justify-center font-black text-white text-lg">
+            M
+          </div>
+          <span className="font-extrabold text-sm uppercase tracking-wider text-gray-100">
+            GATE MockAI — Student Portal
+          </span>
+        </div>
+
+        <div className="flex items-center gap-6">
+          <Link to="/student/dashboard" className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors pb-1">
+            My Progress
           </Link>
-          <span className="font-extrabold text-sm uppercase tracking-wider text-gray-100">Browse Examinations</span>
+          <Link to="/student/tests" className="text-xs uppercase font-extrabold text-blue-500 border-b-2 border-blue-500 pb-1">
+            Browse Exams
+          </Link>
+          <a 
+            href="/logout"
+            className="p-1.5 hover:bg-white/10 rounded-full transition-all duration-150 text-gray-400 hover:text-white"
+            title="Log Out"
+          >
+            <LogOut className="w-5 h-5" />
+          </a>
         </div>
       </nav>
 
