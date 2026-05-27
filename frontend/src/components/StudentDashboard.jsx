@@ -383,24 +383,36 @@ export default function StudentDashboard() {
           {/* Card 5: Score Trend */}
           <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col justify-between">
             <span className="text-[10px] text-gray-400 font-extrabold uppercase tracking-wider block">Score Trend</span>
-            <div className="flex items-center gap-1.5 mt-2">
-              {scoreTrend > 0 ? (
-                <>
-                  <span className="text-green-600 text-lg font-black leading-none">↑</span>
-                  <span className="text-lg font-black text-green-600">+{scoreTrend.toFixed(1)}%</span>
-                </>
-              ) : scoreTrend < 0 ? (
-                <>
-                  <span className="text-red-500 text-lg font-black leading-none">↓</span>
-                  <span className="text-lg font-black text-red-500">{scoreTrend.toFixed(1)}%</span>
-                </>
-              ) : (
-                <>
-                  <span className="text-gray-400 text-lg font-black leading-none">→</span>
-                  <span className="text-sm font-extrabold text-gray-400">No change</span>
-                </>
-              )}
-            </div>
+            {totalAttempts === 0 ? (
+              <div className="mt-1 flex flex-col gap-0.5">
+                <h3 className="text-2xl font-black text-gray-400">—</h3>
+                <p className="text-[10px] text-gray-400 font-medium">Take your first test to start tracking!</p>
+              </div>
+            ) : totalAttempts === 1 ? (
+              <div className="mt-1 flex flex-col gap-0.5">
+                <h3 className="text-2xl font-black text-gray-400">—</h3>
+                <p className="text-[10px] text-gray-400 font-medium">Take another test to see progress!</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5 mt-2">
+                {scoreTrend > 0 ? (
+                  <>
+                    <span className="text-green-600 text-lg font-black leading-none">↑</span>
+                    <span className="text-lg font-black text-green-600">+{scoreTrend.toFixed(1)}%</span>
+                  </>
+                ) : scoreTrend < 0 ? (
+                  <>
+                    <span className="text-red-500 text-lg font-black leading-none">↓</span>
+                    <span className="text-lg font-black text-red-500">{scoreTrend.toFixed(1)}%</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-gray-400 text-lg font-black leading-none">→</span>
+                    <span className="text-sm font-extrabold text-gray-400">No change</span>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

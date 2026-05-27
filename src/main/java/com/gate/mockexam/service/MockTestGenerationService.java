@@ -37,6 +37,7 @@ public class MockTestGenerationService {
     private final MockTestRepository mockTestRepository;
     private final QuestionRepository questionRepository;
     private final OptionRepository optionRepository;
+    private final GeminiUsageService geminiUsageService;
 
     @Value("classpath:prompts/generate_mock_test.st")
     private Resource promptTemplate;
@@ -224,47 +225,83 @@ public class MockTestGenerationService {
                     .replace("{contextCount}", String.valueOf(contextDocs.size()))
                     .replace("{contextQuestions}", contextQuestions);
 
+                // Notify prompt sent
+                progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Sending context-grounded prompt to Gemini 2.5 Flash...\", \"percent\": %d}", stepNo, percent));
+
+                int totalQuestionCount = Integer.parseInt(mcqCount) + Integer.parseInt(msqCount) + Integer.parseInt(natCount);
+                log.info("[Generation] Starting AI call for topic: {}, questionCount: {}", segmentName, totalQuestionCount);
+                log.info("[Generation] Context docs retrieved: {} documents", contextDocs != null ? contextDocs.size() : 0);
+                log.info("[Generation] Prompt length: {} chars", prompt != null ? prompt.length() : 0);
+
                 // Call Gemini LLM
-                String rawJson = geminiService.generateJsonContent(prompt);
+                String rawJson;
+                List<AiGeneratedQuestionDto> questionsList = null;
+                try {
+                    rawJson = geminiService.generateJsonContent(prompt);
+                    log.info("[Generation] AI response received, length: {} chars", rawJson != null ? rawJson.length() : 0);
+                    progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Response received — parsing questions...\", \"percent\": %d}", stepNo, percent));
+                    
+                    String cleaned = extractJsonArray(rawJson);
+                    questionsList = objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<AiGeneratedQuestionDto>>() {});
+                } catch (Exception e) {
+                    log.warn("Gemini returned invalid JSON or timed out for segment {}, retrying once with temperature 0.3...", segmentName, e);
+                    progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Warning] Gemini returned invalid JSON. The prompt may need adjustment. Retrying...\", \"percent\": %d}", stepNo, percent));
+                    
+                    // Retry once with temperature 0.3
+                    rawJson = geminiService.generateJsonContent(prompt, 0.3);
+                    log.info("[Generation] AI response received on retry, length: {} chars", rawJson != null ? rawJson.length() : 0);
+                    
+                    String cleaned = extractJsonArray(rawJson);
+                    questionsList = objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<AiGeneratedQuestionDto>>() {});
+                }
 
-                String cleaned = rawJson.trim()
-                    .replaceAll("^```json\\s*", "")
-                    .replaceAll("^```\\s*", "")
-                    .replaceAll("```$", "")
-                    .trim();
+                // Notify parsing and validating
+                progressCallback.accept(String.format("{\"step\": %d, \"message\": \"Parsing and validating generated questions...\", \"percent\": %d}", stepNo, percent));
 
-                AiGeneratedQuestionsListDto listDto = objectMapper.readValue(cleaned, AiGeneratedQuestionsListDto.class);
+                // Record token usage and emit
+                try {
+                    com.gate.mockexam.entity.GeminiTokenUsage lastUsage = geminiUsageService.getLastUsageRecord();
+                    if (lastUsage != null) {
+                        double cost = lastUsage.getTotalTokens() * 0.0000025;
+                        progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Tokens used: %d · Est. cost: $%.6f\", \"percent\": %d}", 
+                            stepNo, lastUsage.getTotalTokens(), cost, percent));
+                    }
+                } catch (Exception ex) {
+                    log.warn("Could not log token usage during progress callback: {}", ex.getMessage());
+                }
 
                 // Persist segment questions
-                for (AiGeneratedQuestionDto qDto : listDto.getQuestions()) {
-                    Question question = Question.builder()
-                        .test(test)
-                        .questionText(qDto.getQuestionText())
-                        .type(QuestionType.valueOf(qDto.getType()))
-                        .marks(BigDecimal.valueOf(qDto.getMarks()))
-                        .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
-                        .correctNatValue(qDto.getCorrectNatValue())
-                        .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
-                        .sequenceNo(qDto.getSequenceNo())
-                        .explanation(qDto.getExplanation())
-                        .build();
+                if (questionsList != null) {
+                    for (AiGeneratedQuestionDto qDto : questionsList) {
+                        Question question = Question.builder()
+                            .test(test)
+                            .questionText(qDto.getQuestionText())
+                            .type(QuestionType.valueOf(qDto.getType()))
+                            .marks(BigDecimal.valueOf(qDto.getMarks()))
+                            .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
+                            .correctNatValue(qDto.getCorrectNatValue())
+                            .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
+                            .sequenceNo(qDto.getSequenceNo())
+                            .explanation(qDto.getExplanation())
+                            .build();
 
-                    question = questionRepository.save(question);
-                    aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
+                        question = questionRepository.save(question);
+                        aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
 
-                    if (qDto.getOptions() != null) {
-                        for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
-                            Option opt = Option.builder()
-                                .question(question)
-                                .optionLabel(oDto.getLabel().charAt(0))
-                                .optionText(oDto.getText())
-                                .isCorrect(oDto.isCorrect())
-                                .build();
-                            opt = optionRepository.save(opt);
-                            question.getOptions().add(opt);
+                        if (qDto.getOptions() != null) {
+                            for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
+                                Option opt = Option.builder()
+                                    .question(question)
+                                    .optionLabel(oDto.getLabel().charAt(0))
+                                    .optionText(oDto.getText())
+                                    .isCorrect(oDto.isCorrect())
+                                    .build();
+                                opt = optionRepository.save(opt);
+                                question.getOptions().add(opt);
+                            }
                         }
+                        test.getQuestions().add(question);
                     }
-                    test.getQuestions().add(question);
                 }
 
             } catch (Exception e) {
@@ -360,41 +397,82 @@ public class MockTestGenerationService {
                     .replace("{contextCount}", String.valueOf(contextDocs.size()))
                     .replace("{contextQuestions}", contextQuestions);
 
-                String rawJson = geminiService.generateJsonContent(prompt);
-                String cleaned = rawJson.trim()
-                    .replaceAll("^```json\\s*", "").replaceAll("^```\\s*", "").replaceAll("```$", "").trim();
+                // Notify prompt sent
+                progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Sending context-grounded prompt to Gemini 2.5 Flash...\", \"percent\": %d}", stepNo, percent));
 
-                AiGeneratedQuestionsListDto listDto = objectMapper.readValue(cleaned, AiGeneratedQuestionsListDto.class);
+                int totalQuestionCount = oneMarkMcq + twoMarkMcq + nat;
+                log.info("[Generation] Starting AI call for topic: {}, questionCount: {}", subjectName, totalQuestionCount);
+                log.info("[Generation] Context docs retrieved: {} documents", contextDocs != null ? contextDocs.size() : 0);
+                log.info("[Generation] Prompt length: {} chars", prompt != null ? prompt.length() : 0);
 
-                for (AiGeneratedQuestionDto qDto : listDto.getQuestions()) {
-                    Question question = Question.builder()
-                        .test(test)
-                        .questionText(qDto.getQuestionText())
-                        .type(QuestionType.valueOf(qDto.getType()))
-                        .marks(BigDecimal.valueOf(qDto.getMarks()))
-                        .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
-                        .correctNatValue(qDto.getCorrectNatValue())
-                        .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
-                        .sequenceNo(globalSeqNo++)
-                        .explanation(qDto.getExplanation())
-                        .build();
+                // Call Gemini LLM
+                String rawJson;
+                List<AiGeneratedQuestionDto> questionsList = null;
+                try {
+                    rawJson = geminiService.generateJsonContent(prompt);
+                    log.info("[Generation] AI response received, length: {} chars", rawJson != null ? rawJson.length() : 0);
+                    progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Response received — parsing questions...\", \"percent\": %d}", stepNo, percent));
+                    
+                    String cleaned = extractJsonArray(rawJson);
+                    questionsList = objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<AiGeneratedQuestionDto>>() {});
+                } catch (Exception e) {
+                    log.warn("Gemini returned invalid JSON or timed out for subject {}, retrying once with temperature 0.3...", subjectName, e);
+                    progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Warning] Gemini returned invalid JSON. The prompt may need adjustment. Retrying...\", \"percent\": %d}", stepNo, percent));
+                    
+                    // Retry once with temperature 0.3
+                    rawJson = geminiService.generateJsonContent(prompt, 0.3);
+                    log.info("[Generation] AI response received on retry, length: {} chars", rawJson != null ? rawJson.length() : 0);
+                    
+                    String cleaned = extractJsonArray(rawJson);
+                    questionsList = objectMapper.readValue(cleaned, new com.fasterxml.jackson.core.type.TypeReference<List<AiGeneratedQuestionDto>>() {});
+                }
 
-                    question = questionRepository.save(question);
-                    aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
+                // Notify parsing and validating
+                progressCallback.accept(String.format("{\"step\": %d, \"message\": \"Parsing and validating generated questions...\", \"percent\": %d}", stepNo, percent));
 
-                    if (qDto.getOptions() != null) {
-                        for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
-                            Option opt = Option.builder()
-                                .question(question)
-                                .optionLabel(oDto.getLabel().charAt(0))
-                                .optionText(oDto.getText())
-                                .isCorrect(oDto.isCorrect())
-                                .build();
-                            opt = optionRepository.save(opt);
-                            question.getOptions().add(opt);
-                        }
+                // Record token usage and emit
+                try {
+                    com.gate.mockexam.entity.GeminiTokenUsage lastUsage = geminiUsageService.getLastUsageRecord();
+                    if (lastUsage != null) {
+                        double cost = lastUsage.getTotalTokens() * 0.0000025;
+                        progressCallback.accept(String.format("{\"step\": %d, \"message\": \"[Gemini] Tokens used: %d · Est. cost: $%.6f\", \"percent\": %d}", 
+                            stepNo, lastUsage.getTotalTokens(), cost, percent));
                     }
-                    test.getQuestions().add(question);
+                } catch (Exception ex) {
+                    log.warn("Could not log token usage during progress callback: {}", ex.getMessage());
+                }
+
+                if (questionsList != null) {
+                    for (AiGeneratedQuestionDto qDto : questionsList) {
+                        Question question = Question.builder()
+                            .test(test)
+                            .questionText(qDto.getQuestionText())
+                            .type(QuestionType.valueOf(qDto.getType()))
+                            .marks(BigDecimal.valueOf(qDto.getMarks()))
+                            .negativeMarks(BigDecimal.valueOf(qDto.getNegativeMarks()))
+                            .correctNatValue(qDto.getCorrectNatValue())
+                            .natTolerance(qDto.getNatTolerance() != null ? qDto.getNatTolerance() : 0.0)
+                            .sequenceNo(globalSeqNo++)
+                            .explanation(qDto.getExplanation())
+                            .build();
+
+                        question = questionRepository.save(question);
+                        aggregatedTotalMarks = aggregatedTotalMarks.add(question.getMarks());
+
+                        if (qDto.getOptions() != null) {
+                            for (AiGeneratedOptionDto oDto : qDto.getOptions()) {
+                                Option opt = Option.builder()
+                                    .question(question)
+                                    .optionLabel(oDto.getLabel().charAt(0))
+                                    .optionText(oDto.getText())
+                                    .isCorrect(oDto.isCorrect())
+                                    .build();
+                                opt = optionRepository.save(opt);
+                                question.getOptions().add(opt);
+                            }
+                        }
+                        test.getQuestions().add(question);
+                    }
                 }
 
             } catch (Exception e) {
@@ -407,6 +485,54 @@ public class MockTestGenerationService {
         test = mockTestRepository.save(test);
         log.info("Weighted GATE Paper complete! Questions: {}, Marks: {}", test.getQuestions().size(), test.getTotalMarks());
         return test;
+    }
+
+    private String extractJsonArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            log.error("Gemini returned null or empty response");
+            return "[]";
+        }
+        String s = raw.strip();
+
+        // Strip markdown code fences (Gemini does this often)
+        if (s.startsWith("```")) {
+            s = s.replaceAll("(?s)^```[a-zA-Z]*\\s*", "");
+            s = s.replaceAll("(?s)\\s*```$", "");
+            s = s.strip();
+            log.info("Stripped markdown fences from Gemini response");
+        }
+
+        // Strip any preamble text before the JSON array
+        // (Gemini sometimes says "Here is the JSON:" before the array)
+        int arrayStart = s.indexOf('[');
+        if (arrayStart < 0) {
+            log.error("No JSON array found in Gemini response. Raw: {}", s.substring(0, Math.min(200, s.length())));
+            return "[]";
+        }
+        if (arrayStart > 0) {
+            log.warn("Trimmed {} chars of preamble before JSON array", arrayStart);
+            s = s.substring(arrayStart);
+        }
+
+        // Find matching closing bracket
+        int arrayEnd = s.lastIndexOf(']');
+        if (arrayEnd < 0) {
+            log.warn("JSON array not closed — truncation detected. Attempting repair.");
+            // Find last complete object
+            int lastBrace = s.lastIndexOf('}');
+            if (lastBrace > 0) {
+                s = s.substring(0, lastBrace + 1) + "]";
+                log.warn("Repaired: closed array after last complete object at pos {}", lastBrace);
+            } else {
+                log.error("Cannot repair truncated JSON — no complete object found");
+                return "[]";
+            }
+        } else {
+            // Trim anything after the closing bracket
+            s = s.substring(0, arrayEnd + 1);
+        }
+
+        return s;
     }
 
     @lombok.Data

@@ -2,6 +2,7 @@ package com.gate.mockexam.controller;
 
 import com.gate.mockexam.dto.MockTestSummaryDto;
 import com.gate.mockexam.entity.Branch;
+import com.gate.mockexam.entity.MockTest;
 import com.gate.mockexam.repository.BranchRepository;
 import com.gate.mockexam.service.MockTestService;
 import com.gate.mockexam.service.RagIngestionService;
@@ -25,6 +26,12 @@ public class AdminPortalApiController {
 
     @Value("${gate.rag.vector-store-path}")
     private String vectorStorePath;
+
+    @Value("${gemini.api.key}")
+    private String apiKey;
+
+    @Value("${gemini.model.transcription:gemini-2.5-flash}")
+    private String transcriptionModel;
 
     public AdminPortalApiController(
             MockTestService mockTestService,
@@ -165,6 +172,51 @@ public class AdminPortalApiController {
         } catch (Exception e) {
             log.error("Failed to reingest seed questions via REST: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Re-ingestion failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/gemini-status")
+    public ResponseEntity<Map<String, Object>> geminiStatus(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).build();
+        }
+        boolean keySet = apiKey != null && !apiKey.trim().equals("NOT_SET") && !apiKey.trim().isEmpty();
+        return ResponseEntity.ok(Map.of(
+            "connected", keySet,
+            "model", transcriptionModel,
+            "apiKeySet", keySet
+        ));
+    }
+
+    @PutMapping("/mock-tests/{id}/publish")
+    public ResponseEntity<?> publishMockTest(@PathVariable("id") UUID id, Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        try {
+            mockTestService.publishTest(id);
+            MockTest test = mockTestService.getTestById(id);
+            if (test == null) {
+                return ResponseEntity.status(404).body("Mock test not found");
+            }
+            
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", test.getId());
+            map.put("title", test.getTitle());
+            map.put("topic", test.getTopic());
+            map.put("subject", test.getSubject());
+            map.put("durationMinutes", test.getDurationMinutes());
+            map.put("totalMarks", test.getTotalMarks());
+            map.put("isPublished", test.isPublished());
+            map.put("published", test.isPublished());
+            map.put("branch", test.getBranch());
+            map.put("yearLabel", test.getYearLabel());
+            map.put("createdAt", test.getCreatedAt());
+            
+            return ResponseEntity.ok(map);
+        } catch (Exception e) {
+            log.error("Failed to publish mock test: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body("Error publishing test: " + e.getMessage());
         }
     }
 }

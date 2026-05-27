@@ -10,23 +10,51 @@ import com.fasterxml.jackson.databind.JsonDeserializer;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.io.IOException;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class AiGeneratedQuestionDto {
+    @JsonProperty("sequenceNo")
     private int sequenceNo;
+
+    @JsonProperty("section")
     private String section;         // "GA", "CS"
+
+    @JsonProperty("type")
     private String type;            // "MCQ", "MSQ", "NAT"
+
+    @JsonProperty("questionText")
     private String questionText;
+
+    @JsonProperty("marks")
     private double marks;
+
+    @JsonProperty("negativeMarks")
     private double negativeMarks;
 
+    @JsonProperty("correctNatValue")
     @JsonDeserialize(using = CorrectNatValueDeserializer.class)
     private Double correctNatValue;
 
+    @JsonProperty("natTolerance")
     private Double natTolerance;
+
+    @JsonProperty("explanation")
     private String explanation;
+
+    @JsonProperty("subject")
     private String subject;         // Auto-classified by local LLM, e.g. "Operating Systems"
+
+    @JsonProperty("topic")
     private String topic;           // Auto-classified by local LLM, e.g. "CPU Scheduling"
+
+    @JsonProperty("options")
     private List<AiGeneratedOptionDto> options;
+
+    @JsonProperty("hasImage")
+    private Boolean hasImage;
 
     public static class CorrectNatValueDeserializer extends JsonDeserializer<Double> {
         private double roundTo4Decimals(double val) {

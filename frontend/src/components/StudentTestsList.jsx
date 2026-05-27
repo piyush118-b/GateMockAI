@@ -131,9 +131,24 @@ export default function StudentTestsList() {
         </div>
 
         {tests.length === 0 ? (
-          <div className="bg-white border border-gray-200 rounded-lg p-16 text-center shadow-sm">
+          <div className="bg-white border border-gray-200 rounded-lg p-16 text-center shadow-sm flex flex-col items-center">
             <FileText className="w-12 h-12 text-gray-300 mx-auto" />
-            <p className="text-gray-500 font-medium mt-3">No active mock test papers are currently published by the Administrator.</p>
+            <h3 className="text-gray-800 font-extrabold text-lg mt-4">No exams published yet</h3>
+            <p className="text-gray-500 font-medium text-xs mt-1">The admin is preparing mock papers. Check back soon!</p>
+            
+            <div className="mt-8 flex flex-col items-center gap-3">
+              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Coming soon:</span>
+              <div className="flex flex-wrap justify-center gap-2">
+                {["Operating Systems", "Algorithms", "Computer Networks"].map((topic, index) => (
+                  <span 
+                    key={index} 
+                    className="inline-flex bg-gray-50 text-gray-500 text-[10px] font-extrabold uppercase px-2.5 py-1 border border-gray-200 rounded-full tracking-wide font-sans"
+                  >
+                    {topic}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

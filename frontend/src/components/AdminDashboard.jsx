@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ShieldAlert, Database, FileText, CheckSquare, Sparkles, RefreshCw, Loader2, ArrowRight, PlusCircle, Pencil, Trash2, CheckCircle, XCircle, AlertTriangle } from 'lucide-react'
+import { ShieldAlert, Database, FileText, CheckSquare, Sparkles, RefreshCw, Loader2, ArrowRight, PlusCircle, Pencil, Trash2, CheckCircle, XCircle, AlertTriangle, Check } from 'lucide-react'
 
 export default function AdminDashboard() {
   const [data, setData] = useState(null);
@@ -16,7 +16,57 @@ export default function AdminDashboard() {
   const [deleteConfirmTest, setDeleteConfirmTest] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
 
+  // Gemini token usage telemetry
+  const [tokenUsage, setTokenUsage] = useState(null);
+  const [quotaExceeded, setQuotaExceeded] = useState(false);
+
+  // Gemini status and Toast state
+  const [geminiStatus, setGeminiStatus] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message) => {
+    setToast(message);
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
   const fetchDashboard = () => {
+    // Fetch today's token usage details
+    fetch('/api/admin/token-usage/today')
+      .then(res => {
+        if (res.status === 429) {
+          setQuotaExceeded(true);
+          return res.json();
+        }
+        if (!res.ok) throw new Error('Failed to load token usage stats.');
+        return res.json();
+      })
+      .then(json => {
+        if (json) {
+          setTokenUsage(json);
+          if (json.totalTokens >= json.limitTokens) {
+            setQuotaExceeded(true);
+          }
+        }
+      })
+      .catch(err => {
+        console.warn('Failed to load token usage details:', err.message);
+      });
+
+    // Fetch Gemini API status
+    fetch('/api/admin/gemini-status')
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load Gemini status.');
+        return res.json();
+      })
+      .then(json => {
+        setGeminiStatus(json);
+      })
+      .catch(err => {
+        console.warn('Failed to load Gemini API status:', err.message);
+      });
+
     fetch('/api/admin/dashboard')
       .then(res => {
         if (!res.ok) throw new Error('Failed to load admin dashboard REST metrics.');
@@ -36,19 +86,24 @@ export default function AdminDashboard() {
     fetchDashboard();
   }, []);
 
-  const handleTogglePublish = (testId, isCurrentlyPublished) => {
+  const handlePublishTest = (testId) => {
     setPublishingId(testId);
-    const endpoint = isCurrentlyPublished 
-      ? `/api/admin/tests/${testId}/unpublish` 
-      : `/api/admin/tests/${testId}/publish`;
-    fetch(endpoint, { method: 'POST' })
+    fetch(`/api/admin/mock-tests/${testId}/publish`, { method: 'PUT' })
       .then(res => {
-        if (!res.ok) throw new Error(isCurrentlyPublished ? 'Unpublish action failed.' : 'Publish action failed.');
+        if (!res.ok) throw new Error('Publish action failed.');
         return res.json();
       })
-      .then(() => {
+      .then((updatedTest) => {
         setPublishingId(null);
-        fetchDashboard(); // reload metrics
+        showToast("Paper published — students can now see it");
+        setData(prevData => {
+          if (!prevData) return prevData;
+          return {
+            ...prevData,
+            publishedCount: prevData.publishedCount + 1,
+            tests: prevData.tests.map(t => t.id === testId ? { ...t, isPublished: true, published: true } : t)
+          };
+        });
       })
       .catch(err => {
         alert(err.message);
@@ -153,10 +208,30 @@ export default function AdminDashboard() {
 
       {/* DASHBOARD BODY */}
       <main className="max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6 flex-1">
+        {/* API QUOTA BANNERS */}
+        {quotaExceeded && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 text-red-800 shadow-sm animate-fade-in">
+            <XCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+            <div>
+              <p className="font-extrabold text-sm uppercase tracking-wide">🚫 Daily token limit reached</p>
+              <p className="text-xs text-red-700 mt-1">All AI operations (past paper ingestion and test generation) are paused until midnight IST.</p>
+            </div>
+          </div>
+        )}
+        {!quotaExceeded && tokenUsage && tokenUsage.remainingTokens < 50000 && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 text-amber-800 shadow-sm animate-pulse">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+            <div>
+              <p className="font-extrabold text-sm uppercase tracking-wide">⚠ Gemini quota nearly exhausted</p>
+              <p className="text-xs text-amber-700 mt-1">Only {tokenUsage.remainingTokens.toLocaleString()} tokens left today. Ingestion and generation are paused until midnight.</p>
+            </div>
+          </div>
+        )}
+
         {/* TOP METRICS GRID */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div className="bg-blue-50 text-blue-600 p-3.5 rounded-full">
+            <div className="bg-blue-50 text-blue-600 p-3.5 rounded-full shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
@@ -166,7 +241,7 @@ export default function AdminDashboard() {
           </div>
 
           <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div className="bg-green-50 text-green-600 p-3.5 rounded-full">
+            <div className="bg-green-50 text-green-600 p-3.5 rounded-full shrink-0">
               <CheckSquare className="w-5 h-5" />
             </div>
             <div>
@@ -175,17 +250,46 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4 col-span-2">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
+            <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-full shrink-0">
+              <Database className="w-5 h-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">Vector Embeddings (PGVector)</span>
+              <h3 className="text-xl font-black text-gray-800 mt-1 truncate">{vectorCount} vectors</h3>
+              <p className="text-[9px] text-gray-400 mt-0.5 truncate font-mono">PostgreSQL · pgvector extension</p>
+            </div>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col justify-between min-h-[96px]">
+            <div className="flex items-center gap-4">
               <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-full shrink-0">
-                <Database className="w-5 h-5" />
+                <Sparkles className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">Vector Embeddings (PGVector)</span>
-                <h3 className="text-xl font-black text-gray-800 mt-1 truncate">{vectorCount} vectors</h3>
-                <p className="text-[9px] text-gray-400 mt-0.5 truncate font-mono">{storePath}</p>
+                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">API TOKENS TODAY</span>
+                <h3 className="text-lg font-black text-gray-800 mt-1 truncate">
+                  {tokenUsage ? `${(tokenUsage.totalTokens || 0).toLocaleString()} / ${(tokenUsage.limitTokens || 500000) / 1000}K` : '0 / 500K'}
+                </h3>
               </div>
             </div>
+            {tokenUsage && (
+              <div className="mt-2.5">
+                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                  <div 
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      (tokenUsage.totalTokens / tokenUsage.limitTokens) > 0.8 ? 'bg-red-500' :
+                      (tokenUsage.totalTokens / tokenUsage.limitTokens) > 0.5 ? 'bg-amber-500' : 'bg-green-500'
+                    }`}
+                    style={{ width: `${Math.min(100, ((tokenUsage.totalTokens || 0) / (tokenUsage.limitTokens || 500000)) * 100)}%` }}
+                  />
+                </div>
+                <div className="flex justify-between items-center mt-1 text-[9px] text-gray-400 font-bold">
+                  <span>Est. cost: ${tokenUsage.estimatedCostUsd ? tokenUsage.estimatedCostUsd.toFixed(4) : '0.0000'}</span>
+                  <span>{Math.round(((tokenUsage.totalTokens || 0) / (tokenUsage.limitTokens || 500000)) * 100)}%</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -277,13 +381,25 @@ export default function AdminDashboard() {
               <p className="text-[11px] text-gray-500 leading-relaxed">
                 Upload official exam papers and matching answer key sheets to chunk, auto-classify, explain, and index new RAG sources.
               </p>
-              <Link
-                to="/admin/rag"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold py-2.5 px-4 rounded-[4px] shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider"
-              >
-                <PlusCircle className="w-4 h-4" />
-                <span>Ingest Past Papers (RAG)</span>
-              </Link>
+              <div className="flex flex-col sm:flex-row items-center gap-2 mt-1">
+                <Link
+                  to="/admin/rag"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold py-2.5 px-4 rounded-[4px] shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider w-full text-center"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Ingest Past Papers (RAG)</span>
+                </Link>
+                {geminiStatus && (
+                  <span className={`shrink-0 px-2 py-2 rounded-[4px] text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 border w-full sm:w-auto justify-center ${
+                    geminiStatus.connected
+                      ? 'bg-green-50 text-green-700 border-green-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  }`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${geminiStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    {geminiStatus.connected ? 'Gemini 2.5 Flash Connected' : 'API Key Not Set'}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
 
@@ -330,22 +446,21 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          {/* Publish / Unpublish Toggle */}
                           <button
                             type="button"
-                            disabled={publishingId === test.id}
-                            onClick={() => handleTogglePublish(test.id, test.isPublished || test.published)}
+                            disabled={publishingId === test.id || (test.isPublished || test.published)}
+                            onClick={() => handlePublishTest(test.id)}
                             className={`p-1.5 rounded transition-all duration-150 border ${
                               (test.isPublished || test.published)
-                                ? 'text-amber-600 bg-amber-50 hover:bg-amber-100 border-amber-200'
+                                ? 'text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed'
                                 : 'text-green-600 bg-green-50 hover:bg-green-100 border-green-200'
                             }`}
-                            title={(test.isPublished || test.published) ? 'Unpublish / Set to Draft' : 'Publish / Go Live'}
+                            title={(test.isPublished || test.published) ? 'Paper Published' : 'Publish / Go Live'}
                           >
                             {publishingId === test.id ? (
                               <Loader2 className="w-4 h-4 animate-spin" />
                             ) : (test.isPublished || test.published) ? (
-                              <XCircle className="w-4 h-4" />
+                              <Check className="w-4 h-4" />
                             ) : (
                               <CheckCircle className="w-4 h-4" />
                             )}
@@ -429,6 +544,14 @@ export default function AdminDashboard() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed bottom-5 right-5 bg-slate-950 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2.5 z-50 animate-fade-in border border-slate-800 font-sans">
+          <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+          <span className="text-xs font-bold">{toast}</span>
         </div>
       )}
     </div>

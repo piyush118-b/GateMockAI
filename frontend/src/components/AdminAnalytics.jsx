@@ -336,9 +336,13 @@ export default function AdminAnalytics() {
               <p className="text-[10px] text-gray-400 mt-0.5">Average accuracy rates of all students grouped by syllabus subject (weakest first).</p>
             </div>
 
-            <div className="flex flex-col gap-3.5">
-              {weaknesses.length === 0 ? (
-                <p className="text-xs text-gray-400 italic text-center py-8">No answered questions recorded.</p>
+            <div className="flex flex-col gap-3.5 flex-1 justify-center">
+              {weaknesses.length === 0 || weaknesses.every(w => w.totalAnswered === 0) ? (
+                <div className="flex flex-col items-center justify-center text-center py-8 px-4 flex-1">
+                  <p className="text-xs text-gray-500 font-medium leading-relaxed max-w-[240px]">
+                    No student attempts yet. Subject breakdown will appear after the first exam submission.
+                  </p>
+                </div>
               ) : (
                 weaknesses.map((weak, idx) => (
                   <div key={idx} className="flex flex-col gap-1">

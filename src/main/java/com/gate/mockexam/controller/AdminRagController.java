@@ -36,6 +36,7 @@ public class AdminRagController {
     private final ObjectMapper objectMapper;
     private final QuestionRepository questionRepository;
     private final ExecutorService chunkExecutor;
+    private final com.gate.mockexam.service.GeminiUsageService geminiUsageService;
 
     public AdminRagController(
             RagIngestionService ragIngestionService,
@@ -44,7 +45,8 @@ public class AdminRagController {
             GeminiService geminiService,
             ObjectMapper objectMapper,
             QuestionRepository questionRepository,
-            @Qualifier("ollamaChunkExecutor") ExecutorService chunkExecutor) {
+            @Qualifier("ollamaChunkExecutor") ExecutorService chunkExecutor,
+            com.gate.mockexam.service.GeminiUsageService geminiUsageService) {
         this.ragIngestionService = ragIngestionService;
         this.documentParserService = documentParserService;
         this.mockTestGenerationService = mockTestGenerationService;
@@ -52,6 +54,7 @@ public class AdminRagController {
         this.objectMapper = objectMapper;
         this.questionRepository = questionRepository;
         this.chunkExecutor = chunkExecutor;
+        this.geminiUsageService = geminiUsageService;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -104,15 +107,33 @@ public class AdminRagController {
             log.info("Calling Gemini for full paper transcription...");
             String rawJson = geminiService.transcribePdfToQuestions(file.getBytes(), manualAnswerKey.trim());
             
-            // Parse JSON response from Gemini
-            String cleaned = rawJson.trim()
-                    .replaceAll("^```json\\s*", "")
-                    .replaceAll("^```\\s*", "")
-                    .replaceAll("```$", "")
-                    .trim();
+            // Log for debugging
+            log.info("Gemini response length: {} chars", rawJson != null ? rawJson.length() : 0);
+            log.info("Response tail: '{}'",
+              rawJson != null && rawJson.length() > 100
+              ? rawJson.substring(rawJson.length() - 100) : rawJson);
 
-            AiGeneratedTestDto alignedTest = objectMapper.readValue(cleaned, AiGeneratedTestDto.class);
-            List<AiGeneratedQuestionDto> uniqueQuestions = alignedTest.getQuestions();
+            // Clean and extract
+            String jsonArray = extractJsonArray(rawJson);
+
+            // Parse with fallback
+            List<AiGeneratedQuestionDto> uniqueQuestions;
+            try {
+                uniqueQuestions = objectMapper.readValue(jsonArray,
+                  new com.fasterxml.jackson.core.type.TypeReference<List<AiGeneratedQuestionDto>>() {});
+                log.info("Successfully parsed {} questions from Gemini response", uniqueQuestions.size());
+            } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+                log.error("JSON parse failed after cleaning. Cleaned JSON start: {}",
+                  jsonArray.substring(0, Math.min(500, jsonArray.length())));
+                log.error("Jackson error: {}", e.getMessage());
+                throw new org.springframework.web.server.ResponseStatusException(
+                  org.springframework.http.HttpStatus.UNPROCESSABLE_ENTITY,
+                  "Gemini response could not be parsed. Raw response was " +
+                  (rawJson != null ? rawJson.length() : 0) +
+                  " chars. Jackson error: " + e.getOriginalMessage() +
+                  ". Try uploading again — responses vary slightly each call."
+                );
+            }
 
             if (uniqueQuestions == null || uniqueQuestions.isEmpty()) {
                 return ResponseEntity.status(422).body(Map.of("error",
@@ -189,14 +210,34 @@ public class AdminRagController {
                 uniqueQuestions.get(i).setSequenceNo(i + 1);
             }
 
-            alignedTest.setTitle("Official GATE Past Paper: " + topic + " (" + subject + ")");
-            alignedTest.setSubject(subject);
-            alignedTest.setTopic(topic);
-            alignedTest.setDurationMinutes(180);
-            alignedTest.setQuestions(uniqueQuestions);
+            Map<String, Object> responseMap = new LinkedHashMap<>();
+            responseMap.put("title", "Official GATE Past Paper: " + topic + " (" + subject + ")");
+            responseMap.put("subject", subject);
+            responseMap.put("topic", topic);
+            responseMap.put("durationMinutes", 180);
+            responseMap.put("questions", uniqueQuestions);
+            responseMap.put("totalExtracted", uniqueQuestions.size());
+            responseMap.put("warningMessage", null);
 
-            return ResponseEntity.ok(alignedTest);
+            try {
+                com.gate.mockexam.entity.GeminiTokenUsage lastUsage = geminiUsageService.getLastUsageRecord();
+                if (lastUsage != null) {
+                    double estCost = (lastUsage.getInputTokens() * 0.0000003) + (lastUsage.getOutputTokens() * 0.0000025);
+                    responseMap.put("tokenUsage", Map.of(
+                        "inputTokens", lastUsage.getInputTokens(),
+                        "outputTokens", lastUsage.getOutputTokens(),
+                        "totalTokens", lastUsage.getTotalTokens(),
+                        "estimatedCostUsd", estCost
+                    ));
+                }
+            } catch (Exception ex) {
+                log.warn("Could not append token usage to RAG upload response: {}", ex.getMessage());
+            }
 
+            return ResponseEntity.ok(responseMap);
+
+        } catch (org.springframework.web.server.ResponseStatusException e) {
+            throw e;
         } catch (Exception e) {
             log.error("Failed to parse and align past paper: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Failed to parse document: " + e.getMessage()));
@@ -296,6 +337,11 @@ public class AdminRagController {
         }
     }
 
+    @GetMapping("/vector-count")
+    public ResponseEntity<Map<String, Object>> getVectorCount() {
+        return ResponseEntity.ok(Map.of("count", ragIngestionService.getVectorCount()));
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // POST /api/admin/rag/test
     // ─────────────────────────────────────────────────────────────────────────
@@ -348,5 +394,53 @@ public class AdminRagController {
             log.warn("Explanation generation failed for question seq={}: {}", q.getSequenceNo(), e.getMessage());
             return null;
         }
+    }
+
+    private String extractJsonArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            log.error("Gemini returned null or empty response");
+            return "[]";
+        }
+        String s = raw.strip();
+
+        // Strip markdown code fences (Gemini does this often)
+        if (s.startsWith("```")) {
+            s = s.replaceAll("(?s)^```[a-zA-Z]*\\s*", "");
+            s = s.replaceAll("(?s)\\s*```$", "");
+            s = s.strip();
+            log.info("Stripped markdown fences from Gemini response");
+        }
+
+        // Strip any preamble text before the JSON array
+        // (Gemini sometimes says "Here is the JSON:" before the array)
+        int arrayStart = s.indexOf('[');
+        if (arrayStart < 0) {
+            log.error("No JSON array found in Gemini response. Raw: {}", s.substring(0, Math.min(200, s.length())));
+            return "[]";
+        }
+        if (arrayStart > 0) {
+            log.warn("Trimmed {} chars of preamble before JSON array", arrayStart);
+            s = s.substring(arrayStart);
+        }
+
+        // Find matching closing bracket
+        int arrayEnd = s.lastIndexOf(']');
+        if (arrayEnd < 0) {
+            log.warn("JSON array not closed — truncation detected. Attempting repair.");
+            // Find last complete object
+            int lastBrace = s.lastIndexOf('}');
+            if (lastBrace > 0) {
+                s = s.substring(0, lastBrace + 1) + "]";
+                log.warn("Repaired: closed array after last complete object at pos {}", lastBrace);
+            } else {
+                log.error("Cannot repair truncated JSON — no complete object found");
+                return "[]";
+            }
+        } else {
+            // Trim anything after the closing bracket
+            s = s.substring(0, arrayEnd + 1);
+        }
+
+        return s;
     }
 }

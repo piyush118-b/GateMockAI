@@ -17,21 +17,44 @@ public class GeminiServiceImpl implements GeminiService {
     private final String generationModel;
     private final RestClient restClient;
     private final ObjectMapper objectMapper;
+    private final GeminiUsageService geminiUsageService;
+
+    @Value("${gemini.model.max-output-tokens.ingestion:65536}")
+    private int maxOutputTokensIngestion;
+
+    @Value("${gemini.model.max-output-tokens.generation:8192}")
+    private int maxOutputTokensGeneration;
+
+    @Value("${gemini.model.temperature.ingestion:0.0}")
+    private double temperatureIngestion;
 
     public GeminiServiceImpl(
             @Value("${gemini.api.key}") String apiKey,
             @Value("${gemini.model.transcription:gemini-2.5-flash}") String transcriptionModel,
             @Value("${gemini.model.generation:gemini-2.5-flash}") String generationModel,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            GeminiUsageService geminiUsageService) {
         this.apiKey = apiKey.trim();
         this.transcriptionModel = transcriptionModel;
         this.generationModel = generationModel;
         this.restClient = RestClient.create();
         this.objectMapper = objectMapper;
+        this.geminiUsageService = geminiUsageService;
+    }
+
+    private void checkApiKey() {
+        if (this.apiKey == null || this.apiKey.trim().isEmpty() || 
+            this.apiKey.trim().equalsIgnoreCase("YOUR_GEMINI_API_KEY") || 
+            this.apiKey.trim().equalsIgnoreCase("placeholder") || 
+            this.apiKey.trim().equalsIgnoreCase("TODO")) {
+            throw new IllegalStateException("GEMINI_API_KEY not configured. Set it in your environment variables.");
+        }
     }
 
     @Override
     public String transcribePdfToQuestions(byte[] pdfBytes, String manualAnswerKey) {
+        checkApiKey();
+        geminiUsageService.checkDailyLimit();
         log.info("Sending entire PDF of size {} bytes to Gemini ({}) for full transcription", pdfBytes.length, transcriptionModel);
 
         String base64Pdf = Base64.getEncoder().encodeToString(pdfBytes);
@@ -91,8 +114,8 @@ public class GeminiServiceImpl implements GeminiService {
                 )
             ),
             "generationConfig", Map.of(
-                "temperature", 0.0,
-                "maxOutputTokens", 8192,
+                "temperature", temperatureIngestion,
+                "maxOutputTokens", maxOutputTokensIngestion,
                 "responseMimeType", "application/json"
             )
         );
@@ -106,6 +129,7 @@ public class GeminiServiceImpl implements GeminiService {
                     .body(Map.class);
 
             if (response != null && response.containsKey("candidates")) {
+                recordUsageHelper("INGESTION", response);
                 List<?> candidates = (List<?>) response.get("candidates");
                 if (!candidates.isEmpty()) {
                     Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
@@ -113,7 +137,18 @@ public class GeminiServiceImpl implements GeminiService {
                     List<?> parts = (List<?>) content.get("parts");
                     if (!parts.isEmpty()) {
                         Map<?, ?> part = (Map<?, ?>) parts.get(0);
-                        return (String) part.get("text");
+                        String rawResponse = (String) part.get("text");
+                        log.info("=== GEMINI RAW RESPONSE START ===");
+                        if (rawResponse != null) {
+                            log.info(rawResponse.substring(0, Math.min(rawResponse.length(), 2000)));
+                            log.info("=== GEMINI RAW RESPONSE END (first 2000 chars) ===");
+                            log.info("Response length: {} chars", rawResponse.length());
+                            log.info("Starts with: '{}'", rawResponse.substring(0, Math.min(50, rawResponse.length())));
+                            log.info("Ends with: '{}'", rawResponse.substring(Math.max(0, rawResponse.length()-100)));
+                        } else {
+                            log.info("rawResponse is null");
+                        }
+                        return rawResponse;
                     }
                 }
             }
@@ -126,6 +161,8 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String generateContent(String prompt) {
+        checkApiKey();
+        geminiUsageService.checkDailyLimit();
         log.info("Sending prompt to Gemini ({}) for content generation", generationModel);
 
         Map<String, Object> requestBody = Map.of(
@@ -138,7 +175,7 @@ public class GeminiServiceImpl implements GeminiService {
             ),
             "generationConfig", Map.of(
                 "temperature", 0.7,
-                "maxOutputTokens", 8192
+                "maxOutputTokens", maxOutputTokensGeneration
             )
         );
 
@@ -151,6 +188,7 @@ public class GeminiServiceImpl implements GeminiService {
                     .body(Map.class);
 
             if (response != null && response.containsKey("candidates")) {
+                recordUsageHelper("EXPLANATION", response);
                 List<?> candidates = (List<?>) response.get("candidates");
                 if (!candidates.isEmpty()) {
                     Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
@@ -171,7 +209,101 @@ public class GeminiServiceImpl implements GeminiService {
 
     @Override
     public String generateJsonContent(String prompt) {
-        log.info("Sending prompt to Gemini ({}) for JSON content generation", generationModel);
+        return generateJsonContent(prompt, 0.7);
+    }
+
+    @Override
+    public String generateJsonContent(String prompt, double temperature) {
+        checkApiKey();
+        geminiUsageService.checkDailyLimit();
+        log.info("Sending prompt to Gemini ({}) for JSON content generation with temperature {}", generationModel, temperature);
+
+        Map<String, Object> requestBody = Map.of(
+            "contents", List.of(
+                Map.of(
+                    "parts", List.of(
+                        Map.of("text", prompt)
+                    )
+                )
+            ),
+            "generationConfig", Map.of(
+                "temperature", temperature,
+                "maxOutputTokens", maxOutputTokensGeneration,
+                "responseMimeType", "application/json"
+            )
+        );
+
+        try {
+            String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", generationModel, apiKey);
+            Map<?, ?> response = restClient.post()
+                    .uri(url)
+                    .body(requestBody)
+                    .retrieve()
+                    .body(Map.class);
+
+            if (response != null && response.containsKey("candidates")) {
+                recordUsageHelper("GENERATION", response);
+                List<?> candidates = (List<?>) response.get("candidates");
+                if (!candidates.isEmpty()) {
+                    Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                    Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                    List<?> parts = (List<?>) content.get("parts");
+                    if (!parts.isEmpty()) {
+                        Map<?, ?> part = (Map<?, ?>) parts.get(0);
+                        return (String) part.get("text");
+                    }
+                }
+            }
+            throw new RuntimeException("Empty or invalid response from Gemini API");
+        } catch (Exception e) {
+            log.error("Failed to call Gemini API for JSON generation: {}", e.getMessage(), e);
+            throw new RuntimeException("Gemini JSON generation failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public String generateMockQuestions(String topic, String contextSection, String subjectWeightagesList, int totalCount) {
+        checkApiKey();
+        geminiUsageService.checkDailyLimit();
+        log.info("Generating mock questions for topic: {} totalCount: {}", topic, totalCount);
+
+        String prompt = String.format("""
+            You are an expert GATE CSE exam paper generator.
+
+            REFERENCE QUESTIONS (real GATE past questions for style/difficulty reference):
+            %s
+
+            GENERATION TASK:
+            Generate exactly %d GATE-style questions distributed as follows:
+            %s
+
+            STRICT OUTPUT FORMAT — return ONLY a valid JSON array, no markdown,
+            no explanation, no preamble. Each element:
+            {
+              "sequenceNo": <number>,
+              "section": "GA" for General Aptitude questions, "CS" for all others,
+              "type": "MCQ" or "MSQ" or "NAT",
+              "questionText": "<question text>",
+              "options": [
+                {"label": "A", "text": "<text>"},
+                {"label": "B", "text": "<text>"},
+                {"label": "C", "text": "<text>"}
+              ],
+              "correctOptions": ["A"],
+              "correctNatValue": null,
+              "natTolerance": null,
+              "marks": 1 or 2,
+              "negativeMarks": 0.33 or 0.67 or 0,
+              "explanation": "<2-3 sentence explanation>",
+              "hasImage": false
+            }
+            For NAT: set options to [], correctOptions to [],
+                     set correctNatValue to the answer number.
+            For MSQ: set correctOptions to e.g. ["A", "C"].
+            GA questions: sequenceNo 1-10, section "GA", marks 1 or 2.
+            CS questions: sequenceNo 11-65 (or 11-55), section "CS".
+            Match GATE exam difficulty and notation style exactly.
+            """, contextSection, totalCount, subjectWeightagesList);
 
         Map<String, Object> requestBody = Map.of(
             "contents", List.of(
@@ -197,6 +329,7 @@ public class GeminiServiceImpl implements GeminiService {
                     .body(Map.class);
 
             if (response != null && response.containsKey("candidates")) {
+                recordUsageHelper("GENERATION", response);
                 List<?> candidates = (List<?>) response.get("candidates");
                 if (!candidates.isEmpty()) {
                     Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
@@ -210,8 +343,21 @@ public class GeminiServiceImpl implements GeminiService {
             }
             throw new RuntimeException("Empty or invalid response from Gemini API");
         } catch (Exception e) {
-            log.error("Failed to call Gemini API for JSON generation: {}", e.getMessage(), e);
-            throw new RuntimeException("Gemini JSON generation failed: " + e.getMessage());
+            log.error("Failed to call Gemini API for mock test generation: {}", e.getMessage(), e);
+            throw new RuntimeException("Gemini mock test generation failed: " + e.getMessage());
+        }
+    }
+
+    private void recordUsageHelper(String callType, Map<?, ?> response) {
+        try {
+            if (response != null && response.containsKey("usageMetadata")) {
+                Map<?, ?> usage = (Map<?, ?>) response.get("usageMetadata");
+                int promptTokens = usage.containsKey("promptTokenCount") ? ((Number) usage.get("promptTokenCount")).intValue() : 0;
+                int candidateTokens = usage.containsKey("candidatesTokenCount") ? ((Number) usage.get("candidatesTokenCount")).intValue() : 0;
+                geminiUsageService.recordUsage(callType, promptTokens, candidateTokens);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to extract or record Gemini token usage: {}", e.getMessage());
         }
     }
 }

@@ -1,4 +1,7 @@
 spring:
+  mvc:
+    async:
+      request-timeout: 180000
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
@@ -78,6 +81,14 @@ hyde:
 gemini:
   api:
     key: ${GEMINI_API_KEY}
+  quota:
+    daily-token-limit: 500000
+    warn-threshold: 400000
   model:
     transcription: gemini-2.5-flash
     generation: gemini-2.5-flash
+    max-output-tokens:
+      ingestion: 65536
+      generation: 8192
+    temperature:
+      ingestion: 0.0

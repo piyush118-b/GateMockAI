@@ -1,43 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 
-// ─── Loading Overlay ────────────────────────────────────────────────────────
-function LoadingOverlay({ active, step, stepIndex }) {
-  if (!active) return null
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(12px)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      color: '#fff', padding: '2rem', boxSizing: 'border-box',
-    }}>
-      <div style={{
-        width: 72, height: 72, borderRadius: '50%',
-        border: '4px solid rgba(99,102,241,0.15)',
-        borderTop: '4px solid #6366f1',
-        animation: 'spin 1s linear infinite',
-        marginBottom: '2rem',
-      }} />
-      <div style={{ fontSize: '1.5rem', fontWeight: 800, textAlign: 'center', letterSpacing: '-0.025em', marginBottom: '0.75rem' }}>
-        {step}
-      </div>
-      <div style={{ color: '#64748b', maxWidth: 420, textAlign: 'center', fontSize: '0.95rem', lineHeight: 1.6 }}>
-        Local Qwen parsing engine active. Chunking PDF layout blocks, extracting questions, and aligning with answer keys…
-      </div>
-      <div style={{ marginTop: '2rem', display: 'flex', gap: '0.5rem' }}>
-        {[0,1,2,3,4].map(i => (
-          <div key={i} style={{
-            width: 8, height: 8, borderRadius: '50%',
-            background: i <= stepIndex ? '#6366f1' : 'rgba(99,102,241,0.2)',
-            transition: 'background 0.4s',
-          }} />
-        ))}
-      </div>
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
-  )
-}
-
 // ─── Similarity Search Playground ───────────────────────────────────────────
 function SearchPlayground() {
   const [query, setQuery] = useState('')
@@ -174,6 +137,46 @@ function ReviewPanel({ draft, onConfirm, onCancel }) {
         </button>
       </div>
 
+      {draft.warningMessage && (
+        <div style={{
+          padding: '0.75rem 1rem',
+          background: '#fffbeb',
+          border: '1px solid #fcd34d',
+          borderRadius: 8,
+          color: '#92400e',
+          fontSize: '0.875rem',
+          fontWeight: 600,
+          marginBottom: '1rem',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5rem'
+        }} className="font-sans">
+          <span>⚠</span>
+          <span>{draft.warningMessage}</span>
+        </div>
+      )}
+
+      <div style={{
+        background: '#eef2ff',
+        border: '1px solid #c7d2fe',
+        borderRadius: 8,
+        padding: '0.75rem 1rem',
+        color: '#3730a3',
+        fontSize: '0.875rem',
+        fontWeight: 600,
+        marginBottom: '1.5rem'
+      }} className="font-sans">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: draft.tokenUsage ? '0.2rem' : '0' }}>
+          <span>✦</span>
+          <span>Gemini extracted {draft.totalExtracted || draft.questions.length} questions</span>
+        </div>
+        {draft.tokenUsage && (
+          <div style={{ fontSize: '0.8rem', color: '#4f46e5', fontWeight: 500 }}>
+            Tokens used: {draft.tokenUsage.totalTokens} · Est. cost: ${draft.tokenUsage.estimatedCostUsd ? draft.tokenUsage.estimatedCostUsd.toFixed(4) : '0.0000'}
+          </div>
+        )}
+      </div>
+
       {result && (
         <div style={{
           padding: '1rem 1.25rem', borderRadius: 10, marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.9rem',
@@ -279,6 +282,10 @@ function ReviewPanel({ draft, onConfirm, onCancel }) {
           >
             {confirming ? '⏳ Ingesting…' : result?.success ? '✓ Committed!' : '✓ Confirm & Ingest to PGVector'}
           </button>
+          
+          <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }} className="font-sans">
+            Embedding {draft.questions.length} questions via nomic-embed-text (local, free)
+          </div>
         </div>
       </div>
     </div>
@@ -286,73 +293,115 @@ function ReviewPanel({ draft, onConfirm, onCancel }) {
 }
 
 // ─── Main AdminRag Component ─────────────────────────────────────────────────
-const UPLOAD_STEPS = [
-  'Reading raw text blocks using Apache PDFBox…',
-  'Analyzing layouts and isolating individual question elements…',
-  'Extracting and aligning options with the Answer Key Map…',
-  'Generating comprehensive explanations with Qwen 2.5 Coder…',
-  'Synthesizing MSQ and NAT structures… Almost complete!',
-]
+const statusMessages = [
+  "Sending PDF to Gemini 2.5 Flash...",
+  "Extracting all questions and options...",
+  "Binding answer keys and validating..."
+];
 
 export default function AdminRag() {
+  const formRef = useRef(null)
   const [vectorCount, setVectorCount] = useState('—')
   const [uploading, setUploading] = useState(false)
-  const [uploadStep, setUploadStep] = useState(UPLOAD_STEPS[0])
-  const [uploadStepIdx, setUploadStepIdx] = useState(0)
   const [draft, setDraft] = useState(null)  // holds parsed paper for review
   const [alert, setAlert] = useState(null)  // { type: 'success'|'error', msg }
-  const stepIntervalRef = useRef(null)
+  
+  // Custom Loading states
+  const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [messageIndex, setMessageIndex] = useState(0)
+
+  const refreshStatus = () => {
+    setVectorCount('—')
+    fetch('/api/admin/rag/vector-count')
+      .then(r => r.json())
+      .then(d => setVectorCount(d.count ?? '—'))
+      .catch(() => setVectorCount('—'))
+  }
 
   useEffect(() => {
-    fetch('/api/admin/rag/status')
-      .then(r => r.json())
-      .then(d => setVectorCount(d.vectorCount ?? '?'))
-      .catch(() => {})
+    refreshStatus()
   }, [])
 
-  const startStepAnimation = () => {
-    let idx = 0
-    stepIntervalRef.current = setInterval(() => {
-      idx = Math.min(idx + 1, UPLOAD_STEPS.length - 1)
-      setUploadStep(UPLOAD_STEPS[idx])
-      setUploadStepIdx(idx)
-    }, 2500)
-  }
-
-  const stopStepAnimation = () => {
-    if (stepIntervalRef.current) {
-      clearInterval(stepIntervalRef.current)
-      stepIntervalRef.current = null
+  // Timer useEffect
+  useEffect(() => {
+    let timer = null;
+    if (uploading) {
+      setElapsedSeconds(0);
+      timer = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
     }
-  }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [uploading]);
+
+  // Message Index useEffect
+  useEffect(() => {
+    let msgTimer = null;
+    if (uploading) {
+      setMessageIndex(0);
+      msgTimer = setInterval(() => {
+        setMessageIndex(prev => (prev + 1) % statusMessages.length);
+      }, 4000);
+    }
+    return () => {
+      if (msgTimer) clearInterval(msgTimer);
+    };
+  }, [uploading]);
 
   const handleFormSubmit = async (e) => {
-    e.preventDefault()
-    const form = e.target
+    if (e && e.preventDefault) e.preventDefault()
+    const form = formRef.current || (e && e.target)
+    if (!form) return
     const fd = new FormData(form)
     setUploading(true)
-    setUploadStep(UPLOAD_STEPS[0])
-    setUploadStepIdx(0)
-    startStepAnimation()
+    setAlert(null)
 
     try {
       const res = await fetch('/api/admin/rag/upload', { method: 'POST', body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Upload failed')
+      let data
+      try {
+        data = await res.json()
+      } catch (jsonErr) {
+        const err = new Error('Server returned an invalid response')
+        err.status = res.status
+        throw err
+      }
+      if (!res.ok) {
+        const err = new Error(data.error || data.message || 'Upload failed')
+        err.status = res.status
+        throw err
+      }
       setDraft(data)
     } catch (err) {
-      setAlert({ type: 'error', msg: err.message })
+      const status = err.status
+      let msg = ""
+      let isRetryable = false
+
+      if (status === 422) {
+        msg = "⚠ Gemini responded but the output could not be parsed. This usually resolves on retry. Click 'Parse Again' to try once more."
+        isRetryable = true
+      } else if (status === 429) {
+        msg = "Daily token limit reached. Resets at midnight."
+      } else if (status === 401 || status === 403) {
+        msg = "Check that your GEMINI_API_KEY is set and valid."
+      } else if (status === 503 || !status || err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")) {
+        msg = "Gemini API unreachable. Check your internet connection."
+      } else {
+        msg = `Extraction failed: ${err.message || 'Unknown error occurred.'}`
+      }
+
+      setAlert({ 
+        type: 'error', 
+        isTruncation: isRetryable,
+        msg: msg
+      })
     } finally {
-      stopStepAnimation()
       setUploading(false)
     }
-  }
-
-  const refreshStatus = () => {
-    fetch('/api/admin/rag/status')
-      .then(r => r.json())
-      .then(d => setVectorCount(d.vectorCount ?? '?'))
-      .catch(() => {})
   }
 
   if (draft) {
@@ -376,8 +425,6 @@ export default function AdminRag() {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Inter', sans-serif", overflowY: 'auto', color: '#1e293b' }}>
-      <LoadingOverlay active={uploading} step={uploadStep} stepIndex={uploadStepIdx} />
-
       <div style={{ maxWidth: 1200, margin: '0 auto', padding: '2rem', boxSizing: 'border-box' }}>
         {/* Back nav */}
         <div style={{ marginBottom: '1.5rem' }}>
@@ -391,114 +438,197 @@ export default function AdminRag() {
         <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)', padding: '2.5rem', borderRadius: 16, color: '#fff', marginBottom: '2rem', boxShadow: '0 10px 15px rgba(0,0,0,0.1)' }}>
           <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.025em' }}>RAG Document Ingestion & PGVector</h1>
           <p style={{ margin: '0.6rem 0 0', color: '#94a3b8', fontSize: '0.95rem', lineHeight: 1.6 }}>
-            Upload official GATE syllabus guides, past exam papers, and align them with answer keys. Parsed question blocks are stored persistently in Postgres PGVector.
+            Upload official GATE past exam papers and answer keys. Gemini AI extracts all questions in one fast pass — results are stored in PostgreSQL PGVector for semantic retrieval.
           </p>
         </div>
 
         {/* Alerts */}
         {alert && (
-          <div style={{ padding: '0.9rem 1.25rem', borderRadius: 10, marginBottom: '1.5rem', fontWeight: 600, fontSize: '0.9rem', background: alert.type === 'success' ? '#f0fdf4' : '#fef2f2', border: `1px solid ${alert.type === 'success' ? '#bbf7d0' : '#fecaca'}`, color: alert.type === 'success' ? '#166534' : '#991b1b' }}>
-            {alert.type === 'success' ? '✓ ' : '⚠ '}{alert.msg}
+          <div style={{ 
+            padding: '1rem 1.25rem', 
+            borderRadius: 10, 
+            marginBottom: '1.5rem', 
+            fontWeight: 600, 
+            fontSize: '0.9rem', 
+            background: alert.type === 'success' ? '#f0fdf4' : '#fef2f2', 
+            border: `1px solid ${alert.type === 'success' ? '#bbf7d0' : '#fecaca'}`, 
+            color: alert.type === 'success' ? '#166534' : '#991b1b',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.75rem'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span>{alert.type === 'success' ? '✓ ' : '⚠ '}</span>
+              <span style={{ lineHeight: 1.5 }}>{alert.msg}</span>
+            </div>
+            {alert.type === 'error' && alert.isTruncation && (
+              <button
+                type="button"
+                onClick={() => handleFormSubmit()}
+                style={{
+                  alignSelf: 'flex-start',
+                  padding: '0.5rem 1rem',
+                  background: '#ef4444',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontWeight: 700,
+                  fontSize: '0.8rem',
+                  textTransform: 'uppercase',
+                  cursor: 'pointer',
+                  boxShadow: '0 2px 4px rgba(239,68,68,0.2)',
+                  transition: 'background 0.2s',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.25rem'
+                }}
+                onMouseOver={e => e.target.style.background = '#dc2626'}
+                onMouseOut={e => e.target.style.background = '#ef4444'}
+              >
+                <span>↻</span>
+                <span>Parse Again</span>
+              </button>
+            )}
           </div>
         )}
 
         {/* Main grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '2rem', alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr', gap: '2rem', alignItems: 'start' }} className="rag-grid">
           {/* Upload form card */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1.5rem' }}>
               <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Ingest Question Paper & Key</h2>
               <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 9999, padding: '0.25rem 0.75rem', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
-                {vectorCount} Vectors
+                {vectorCount} {vectorCount === '—' ? 'VECTORS' : 'VECTORS'}
               </span>
             </div>
 
-            <form id="ragForm" onSubmit={handleFormSubmit} encType="multipart/form-data">
-              {/* Question Paper file */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
-                  GATE Question Paper File (.pdf, .txt) *
-                </label>
-                <input
-                  type="file" name="file" accept=".pdf,.txt" required
-                  style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
-                />
-              </div>
-
-              {/* Answer Key File */}
-              <div style={{ marginBottom: '1.25rem' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
-                  Official Answer Key PDF File (.pdf, .txt) — Optional
-                </label>
-                <input
-                  type="file" name="answerKeyFile" accept=".pdf,.txt"
-                  style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
-                />
-              </div>
-
-              {/* Subject + Topic row */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-                <div>
+            <form id="ragForm" ref={formRef} onSubmit={handleFormSubmit} encType="multipart/form-data">
+              <div style={{
+                opacity: uploading ? 0.5 : 1,
+                pointerEvents: uploading ? 'none' : 'auto',
+                transition: 'opacity 0.2s'
+              }}>
+                {/* Question Paper file */}
+                <div style={{ marginBottom: '1.25rem' }}>
                   <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
-                    Domain / Branch *
+                    GATE Question Paper File (.pdf, .txt) *
                   </label>
                   <input
-                    type="text" name="subject" required placeholder="e.g., CSE"
-                    style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.9rem', color: '#0f172a', background: '#fff', outline: 'none' }}
+                    type="file" name="file" accept=".pdf,.txt" required disabled={uploading}
+                    style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Answer Key File */}
+                <div style={{ marginBottom: '1.25rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
+                    Official Answer Key PDF File (.pdf, .txt) — Optional
+                  </label>
+                  <input
+                    type="file" name="answerKeyFile" accept=".pdf,.txt" disabled={uploading}
+                    style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
+                  />
+                </div>
+
+                {/* Subject + Topic row */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
+                      Domain / Branch *
+                    </label>
+                    <input
+                      type="text" name="subject" required placeholder="e.g., CSE" disabled={uploading}
+                      style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.9rem', color: '#0f172a', background: '#fff', outline: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#6366f1'}
+                      onBlur={e => e.target.style.borderColor = '#cbd5e1'}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
+                      Exam Year / Code *
+                    </label>
+                    <input
+                      type="text" name="topic" required placeholder="e.g., GATE 2024" disabled={uploading}
+                      style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.9rem', color: '#0f172a', background: '#fff', outline: 'none' }}
+                      onFocus={e => e.target.style.borderColor = '#6366f1'}
+                      onBlur={e => e.target.style.borderColor = '#cbd5e1'}
+                    />
+                  </div>
+                </div>
+
+                {/* Answer Key Text */}
+                <div style={{ marginBottom: '1.5rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.25rem' }}>
+                    Manual Answer Key Entry — Optional but Recommended
+                  </label>
+                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#94a3b8' }}>
+                    Format as <code>question_number: value</code> (one per line)
+                  </p>
+                  <textarea
+                    name="answerKeyText"
+                    rows={6}
+                    disabled={uploading}
+                    placeholder={"1: B\n2: A, C\n3: 15.5\n4: D"}
+                    style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', background: '#fff', fontFamily: 'monospace', resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
                     onFocus={e => e.target.style.borderColor = '#6366f1'}
                     onBlur={e => e.target.style.borderColor = '#cbd5e1'}
                   />
                 </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
-                    Exam Year / Code *
-                  </label>
-                  <input
-                    type="text" name="topic" required placeholder="e.g., GATE 2024"
-                    style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.9rem', color: '#0f172a', background: '#fff', outline: 'none' }}
-                    onFocus={e => e.target.style.borderColor = '#6366f1'}
-                    onBlur={e => e.target.style.borderColor = '#cbd5e1'}
-                  />
+              </div>
+
+              {uploading ? (
+                <div style={{
+                  background: '#f8fafc',
+                  border: '2px dashed #cbd5e1',
+                  borderRadius: 12,
+                  padding: '1.5rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  textAlign: 'center',
+                  marginTop: '1.5rem'
+                }} className="animate-fade-in font-sans">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4f46e5', fontWeight: 800, fontSize: '0.95rem' }}>
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style={{ animation: 'spin 3s linear infinite' }}>
+                      <path d="M12 2l2.4 7.2 7.2 2.4-7.2 2.4-2.4 7.2-2.4-7.2-7.2-2.4 7.2-2.4z"/>
+                    </svg>
+                    <span>✦ Gemini is reading your paper...</span>
+                  </div>
+                  
+                  <div style={{ width: '100%', marginTop: '1rem', marginBottom: '0.5rem' }}>
+                    <div style={{ display: 'flex', justifyContent: 'center', fontSize: '0.8rem', fontWeight: 700, color: '#475569', marginBottom: '0.6rem' }}>
+                      <span>{statusMessages[messageIndex]}</span>
+                    </div>
+                    
+                    <div style={{ width: '100%', height: 8, background: '#e2e8f0', borderRadius: 4, overflow: 'hidden', position: 'relative' }}>
+                      <div className="gemini-loading-bar" style={{ height: '100%', background: '#4f46e5', borderRadius: 4, width: '40%', position: 'absolute' }} />
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.8rem', fontWeight: 700, color: '#64748b', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <span>⏱ {elapsedSeconds}s elapsed</span>
+                  </div>
                 </div>
-              </div>
-
-              {/* Answer Key Text */}
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.25rem' }}>
-                  Manual Answer Key Entry — Optional but Recommended
-                </label>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#94a3b8' }}>
-                  Format as <code>question_number: value</code> (one per line)
-                </p>
-                <textarea
-                  name="answerKeyText"
-                  rows={6}
-                  placeholder={"1: B\n2: A, C\n3: 15.5\n4: D"}
-                  style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', background: '#fff', fontFamily: 'monospace', resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
-                  onFocus={e => e.target.style.borderColor = '#6366f1'}
-                  onBlur={e => e.target.style.borderColor = '#cbd5e1'}
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={uploading}
-                style={{
-                  width: '100%', padding: '0.875rem 1.5rem',
-                  background: uploading ? '#94a3b8' : 'linear-gradient(135deg,#4f46e5,#4338ca)',
-                  border: 'none', borderRadius: 10, color: '#fff', cursor: uploading ? 'not-allowed' : 'pointer',
-                  fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
-                  boxShadow: uploading ? 'none' : '0 4px 14px rgba(79,70,229,0.25)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                  <polyline points="17 8 12 3 7 8"/>
-                  <line x1="12" y1="3" x2="12" y2="15"/>
-                </svg>
-                {uploading ? 'Parsing with Local AI…' : 'Parse Paper with Local Ollama AI'}
-              </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={uploading}
+                  style={{
+                    width: '100%', padding: '0.875rem 1.5rem',
+                    background: 'linear-gradient(135deg,#4f46e5,#4338ca)',
+                    border: 'none', borderRadius: 10, color: '#fff', cursor: 'pointer',
+                    fontSize: '0.875rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em',
+                    boxShadow: '0 4px 14px rgba(79,70,229,0.25)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem',
+                  }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2l2.4 7.2 7.2 2.4-7.2 2.4-2.4 7.2-2.4-7.2-7.2-2.4 7.2-2.4z"/>
+                  </svg>
+                  Parse Paper with Gemini AI
+                </button>
+              )}
             </form>
           </div>
 
@@ -510,6 +640,14 @@ export default function AdminRag() {
       <style>{`
         @media (max-width: 968px) {
           .rag-grid { grid-template-columns: 1fr !important; }
+        }
+        @keyframes progressPulse {
+          0% { left: -30%; width: 30%; }
+          50% { left: 40%; width: 50%; }
+          100% { left: 100%; width: 30%; }
+        }
+        .gemini-loading-bar {
+          animation: progressPulse 1.8s ease-in-out infinite;
         }
       `}</style>
     </div>
