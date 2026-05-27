@@ -1,4 +1,4 @@
-# GATE MockAI 🎓
+# GATE MockAI !
 ### AI-Powered Academic Assessment & Smart RAG Mock Exam Platform
 
 Welcome to **GATE MockAI**, a production-grade, AI-aligned assessment platform built to ingest, draft, manage, and simulate syllabus-aligned GATE (Graduate Aptitude Test in Engineering) Mock Exams. By combining a split-architecture **React Single Page Application (SPA)** with a **Spring Boot REST API** and a **Retrieval-Augmented Generation (RAG)** pipeline powered by local LLMs (via Ollama), the system provides an end-to-end sandbox for creating, indexing, and emulating high-fidelity, NTA-style examinations.
