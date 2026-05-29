@@ -27,6 +27,7 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
 @RestController
+@RequestMapping("/admin")
 @Slf4j
 public class AdminController {
 
