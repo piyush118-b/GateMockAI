@@ -25,7 +25,7 @@ Your task is to generate a BRAND NEW, completely unique, syllabus-aligned set of
    - **MCQ**: 4 options (A, B, C, D), exactly one correct. Set `marks` to 1 or 2. If 1 mark, set `negativeMarks` to 0.33. If 2 marks, set `negativeMarks` to 0.67.
    - **MSQ**: 4 options (A, B, C, D), 2 or more correct. Set `marks` to 2, and `negativeMarks` to 0.
    - **NAT**: Free numeric entry. Set `marks` to 1 or 2. Set `negativeMarks` to 0. Must specify a valid `correctNatValue` as a single numeric float or integer (NEVER a JSON array or range like [4.5, 4.6]). Example: 4.5. Set `natTolerance` (usually 0.01 for decimal calculations, or 0 for exact values).
-6. **Detailed Derivations**: Every single question must have a clear, rigorous, step-by-step academic conceptual proof and derivation explanation.
+6. **Concise Explanations**: Every single question must have a concise, 2-3 sentence conceptual explanation in the 'explanation' field. Do NOT write extremely long multi-paragraph derivations.
 
 Return ONLY this exact JSON structure (raw, no markdown fences):
 

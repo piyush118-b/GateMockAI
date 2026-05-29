@@ -37,7 +37,14 @@ public class GeminiServiceImpl implements GeminiService {
         this.apiKey = apiKey.trim();
         this.transcriptionModel = transcriptionModel;
         this.generationModel = generationModel;
-        this.restClient = RestClient.create();
+        
+        org.springframework.http.client.SimpleClientHttpRequestFactory factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(60000);
+        factory.setReadTimeout(180000); // Wait up to 3 minutes for long LLM responses
+        
+        this.restClient = RestClient.builder()
+                .requestFactory(factory)
+                .build();
         this.objectMapper = objectMapper;
         this.geminiUsageService = geminiUsageService;
     }
