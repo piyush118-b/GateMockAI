@@ -26,8 +26,7 @@ import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 
-// @Controller
-// @RequestMapping("/admin")
+@RestController
 @Slf4j
 public class AdminController {
 
@@ -50,132 +49,6 @@ public class AdminController {
         this.generationService = generationService;
         this.branchRepository = branchRepository;
         this.objectMapper = objectMapper;
-    }
-
-    @GetMapping("/dashboard")
-    public String dashboard(Model model) {
-        model.addAttribute("pageTitle", "Admin Dashboard");
-        List<MockTestSummaryDto> tests = mockTestService.getAllTests();
-        model.addAttribute("testsCount", tests.size());
-        model.addAttribute("publishedCount", tests.stream().filter(MockTestSummaryDto::isPublished).count());
-        
-        // Expose RAG details to the template directly
-        model.addAttribute("vectorCount", ragIngestionService.getVectorCount());
-        model.addAttribute("storePath", vectorStorePath);
-        
-        return "admin/dashboard";
-    }
-
-    @GetMapping("/tests")
-    public String viewTests(Model model) {
-        model.addAttribute("pageTitle", "Manage Tests");
-        model.addAttribute("tests", mockTestService.getAllTests());
-        return "admin/tests";
-    }
-
-    // GET /admin/tests/generate — show the form (loaded from DB)
-    @GetMapping("/tests/generate")
-    @org.springframework.transaction.annotation.Transactional
-    public String generateForm(Model model) {
-        model.addAttribute("pageTitle", "AI Exam Generator");
-        model.addAttribute("request", new MockTestGenerationRequestDto());
-        List<Branch> branches = branchRepository.findAll();
-        // Eager load the subjects collection for Thymeleaf rendering
-        for (Branch b : branches) {
-            b.getSubjects().size();
-        }
-        model.addAttribute("branches", branches);
-        // Default to first branch (CSE)
-        if (!branches.isEmpty()) {
-            model.addAttribute("defaultBranch", branches.get(0));
-        }
-        return "admin/generate";
-    }
-
-
-    // POST /admin/tests/generate — trigger AI custom-topic generation
-    @PostMapping("/tests/generate")
-    public String generate(@Valid @ModelAttribute("request") MockTestGenerationRequestDto request,
-                            BindingResult result,
-                            Model model,
-                            RedirectAttributes redirectAttributes) {
-        if (result.hasErrors()) {
-            model.addAttribute("pageTitle", "AI Exam Generator");
-            model.addAttribute("branches", branchRepository.findAll());
-            return "admin/generate";
-        }
-        try {
-            MockTest test = generationService.generateAndSaveTest(request);
-            redirectAttributes.addFlashAttribute("success",
-                "Test generated: " + test.getTitle() + " (" + test.getQuestions().size() + " questions)");
-            return "redirect:/admin/tests/" + test.getId();
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Generation failed: " + e.getMessage());
-            return "redirect:/admin/tests/generate";
-        }
-    }
-
-    // POST /admin/tests/generate/weighted — trigger full weighted-syllabus generation
-    @PostMapping("/tests/generate/weighted")
-    @ResponseBody
-    public ResponseEntity<Map<String, String>> generateWeighted(
-            @RequestParam String branchCode,
-            @RequestParam String yearLabel,
-            @RequestBody Map<String, Integer> subjectWeightages,
-            RedirectAttributes redirectAttributes) {
-        // subjectWeightages: { subjectName -> allocatedMarks }
-        try {
-            MockTest test = generationService.generateWeightedGatePaper(branchCode, yearLabel, subjectWeightages, msg -> {});
-            return ResponseEntity.ok(Map.of("redirectUrl", "/admin/tests/" + test.getId()));
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    // GET /admin/tests/{id} — view generated test with all questions
-    @GetMapping("/tests/{id}")
-    public String viewTest(@PathVariable UUID id, Model model) {
-        MockTest test = mockTestService.getTestById(id);
-        if (test == null) {
-            return "redirect:/admin/tests";
-        }
-        model.addAttribute("pageTitle", test.getTitle());
-        model.addAttribute("test", test);
-        return "admin/test-detail";
-    }
-
-    // POST /admin/tests/{id}/publish — make test visible to students
-    @PostMapping("/tests/{id}/publish")
-    public String publishTest(@PathVariable UUID id, RedirectAttributes ra) {
-        try {
-            mockTestService.publishTest(id);
-            ra.addFlashAttribute("success", "Test published successfully.");
-        } catch (Exception e) {
-            ra.addFlashAttribute("error", "Publish failed: " + e.getMessage());
-        }
-        return "redirect:/admin/tests/" + id;
-    }
-
-    // GET /admin/rag/status — returns count of embedded docs
-    @GetMapping("/rag/status")
-    @ResponseBody
-    public Map<String, Object> ragStatus() {
-        return Map.of(
-            "vectorCount", ragIngestionService.getVectorCount(),
-            "storePath", vectorStorePath
-        );
-    }
-
-    // POST /admin/rag/reingest — force re-embed all seed questions
-    @PostMapping("/rag/reingest")
-    public String reingest(RedirectAttributes redirectAttributes) {
-        try {
-            int count = ragIngestionService.ingestSeedQuestions();
-            redirectAttributes.addFlashAttribute("success", "Re-ingested " + count + " questions.");
-        } catch (Exception e) {
-            redirectAttributes.addFlashAttribute("error", "Ingestion failed: " + e.getMessage());
-        }
-        return "redirect:/admin/dashboard";
     }
 
     // GET /admin/tests/generate/progress — Asynchronous full 65-question RAG paper compiler streaming
