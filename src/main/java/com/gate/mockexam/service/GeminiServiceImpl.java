@@ -253,11 +253,22 @@ public class GeminiServiceImpl implements GeminiService {
                 List<?> candidates = (List<?>) response.get("candidates");
                 if (!candidates.isEmpty()) {
                     Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                    log.info("Gemini Candidate metadata: finishReason={}, safetyRatings={}", 
+                        candidate.get("finishReason"), candidate.get("safetyRatings"));
                     Map<?, ?> content = (Map<?, ?>) candidate.get("content");
                     List<?> parts = (List<?>) content.get("parts");
                     if (!parts.isEmpty()) {
                         Map<?, ?> part = (Map<?, ?>) parts.get(0);
-                        return (String) part.get("text");
+                        String rawResponse = (String) part.get("text");
+                        log.info("=== GEMINI JSON GENERATION RAW RESPONSE START ===");
+                        if (rawResponse != null) {
+                            log.info("Raw JSON response length: {}", rawResponse.length());
+                            log.info("Raw JSON snippet: {}", rawResponse.substring(0, Math.min(rawResponse.length(), 2000)));
+                            log.info("=== GEMINI JSON GENERATION RAW RESPONSE END ===");
+                        } else {
+                            log.info("rawResponse is null");
+                        }
+                        return rawResponse;
                     }
                 }
             }
