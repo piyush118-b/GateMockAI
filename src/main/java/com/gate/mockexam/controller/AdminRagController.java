@@ -441,6 +441,49 @@ public class AdminRagController {
             s = s.substring(0, arrayEnd + 1);
         }
 
-        return s;
+        return escapeJsonBackslashes(s);
+    }
+
+    private String escapeJsonBackslashes(String json) {
+        if (json == null) return null;
+        StringBuilder sb = new StringBuilder();
+        int len = json.length();
+        for (int i = 0; i < len; i++) {
+            char c = json.charAt(i);
+            if (c == '\\') {
+                if (i + 1 < len) {
+                    char next = json.charAt(i + 1);
+                    if (next == '"' || next == '\\' || next == '/' || 
+                        next == 'b' || next == 'f' || next == 'n' || 
+                        next == 'r' || next == 't') {
+                        sb.append(c);
+                        sb.append(next);
+                        i++;
+                    } else if (next == 'u' && i + 5 < len && isHex(json.substring(i + 2, i + 6))) {
+                        sb.append(c);
+                        sb.append(json.substring(i + 1, i + 6));
+                        i += 5;
+                    } else {
+                        sb.append("\\\\");
+                    }
+                } else {
+                    sb.append("\\\\");
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private boolean isHex(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
+
