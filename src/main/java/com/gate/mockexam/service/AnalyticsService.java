@@ -433,6 +433,7 @@ public class AnalyticsService {
 
             return new AttemptHistoryEntryDto(
                 a.getId(),
+                a.getTest().getId(),
                 a.getTest().getTitle(),
                 score,
                 totalMarks,
@@ -597,5 +598,33 @@ public class AnalyticsService {
         }
 
         return new RankResponseDto(rank, totalStudents, percentile, test.getTitle());
+    }
+
+    public Map<UUID, Integer> getTimePerQuestion(UUID attemptId) {
+        return attemptAnswerRepository.findByAttemptId(attemptId)
+            .stream()
+            .collect(Collectors.toMap(
+                aa -> aa.getQuestion().getId(),
+                AttemptAnswer::getTimeSpentSeconds
+            ));
+    }
+
+    public double getAverageTimePerMark(UUID attemptId, int marks) {
+        return attemptAnswerRepository.findByAttemptId(attemptId)
+            .stream()
+            .filter(aa -> aa.getQuestion().getMarks() != null && aa.getQuestion().getMarks().intValue() == marks)
+            .mapToInt(AttemptAnswer::getTimeSpentSeconds)
+            .average()
+            .orElse(0.0);
+    }
+
+    public Map<String, Double> getSubjectAccuracy(UUID userId) {
+        return attemptAnswerRepository
+            .findSubmittedAnswersByUserId(userId)
+            .stream()
+            .collect(Collectors.groupingBy(
+                aa -> aa.getQuestion().getTest().getSubject() != null ? aa.getQuestion().getTest().getSubject() : "General",
+                Collectors.averagingDouble(aa -> aa.getIsCorrect() != null && aa.getIsCorrect() ? 1.0 : 0.0)
+            ));
     }
 }

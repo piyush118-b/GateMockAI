@@ -49,6 +49,13 @@ public class RagIngestionService {
      * adds to the vector store in batches of 10.
      */
     public int ingestSeedQuestions() throws IOException {
+        log.info("Truncating vector store table to clear out old embeddings...");
+        try {
+            jdbcTemplate.execute("TRUNCATE TABLE gate_vector_store");
+        } catch (Exception e) {
+            log.warn("Failed to truncate table gate_vector_store: {}", e.getMessage());
+        }
+
         log.info("Loading seed questions from resource: {}", seedQuestionsResource.getFilename());
         List<SeedQuestion> questions = objectMapper.readValue(
             seedQuestionsResource.getInputStream(),

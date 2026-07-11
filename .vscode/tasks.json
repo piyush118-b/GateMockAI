@@ -2,42 +2,6 @@
   "version": "2.0.0",
   "tasks": [
     // ─────────────────────────────────────────────────────────────────
-    // 1. START DATABASE (Docker Compose – Postgres + Ollama)
-    // ─────────────────────────────────────────────────────────────────
-    {
-      "label": "🐳 Start Database (Docker)",
-      "type": "shell",
-      "command": "docker compose up -d",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "infra"
-      },
-      "problemMatcher": []
-    },
-
-    // ─────────────────────────────────────────────────────────────────
-    // 2. STOP DATABASE
-    // ─────────────────────────────────────────────────────────────────
-    {
-      "label": "🛑 Stop Database (Docker)",
-      "type": "shell",
-      "command": "docker compose down",
-      "options": {
-        "cwd": "${workspaceFolder}"
-      },
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "infra"
-      },
-      "problemMatcher": []
-    },
-
-    // ─────────────────────────────────────────────────────────────────
     // 3. BUILD FRONTEND (Vite – compiles React into static/assets)
     // ─────────────────────────────────────────────────────────────────
     {

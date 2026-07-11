@@ -60,12 +60,14 @@ public class AdminController {
         CompletableFuture.runAsync(() -> {
             try {
                 MockTest test = generationService.generateFullGateCsePaper(progressJson -> {
-                    try {
-                        emitter.send(SseEmitter.event()
-                            .name("progress")
-                            .data(progressJson));
-                    } catch (IOException e) {
-                        log.error("Failed to send SSE progress", e);
+                    synchronized (emitter) {
+                        try {
+                            emitter.send(SseEmitter.event()
+                                .name("progress")
+                                .data(progressJson));
+                        } catch (IOException e) {
+                            log.error("Failed to send SSE progress", e);
+                        }
                     }
                 });
 
@@ -127,20 +129,18 @@ public class AdminController {
                  }
  
                  MockTest test = generationService.generateWeightedGatePaper(branchCode, yearLabel, subjectWeightages, progressJson -> {
-                     try {
-                         emitter.send(SseEmitter.event()
-                             .name("progress")
-                             .data(progressJson));
-                     } catch (IOException e) {
-                         log.error("Failed to send SSE progress", e);
+                     synchronized (emitter) {
+                         try {
+                             emitter.send(SseEmitter.event()
+                                 .name("progress")
+                                 .data(progressJson));
+                         } catch (IOException e) {
+                             log.error("Failed to send SSE progress", e);
+                         }
                      }
                  });
  
                  // Send success progress message
-                 emitter.send(SseEmitter.event()
-                     .name("progress")
-                     .data("{\"step\": 6, \"message\": \"[Success] Mock test saved to database.\", \"percent\": 100}"));
-
                  // Send final completion message with redirect url
                  emitter.send(SseEmitter.event()
                      .name("complete")

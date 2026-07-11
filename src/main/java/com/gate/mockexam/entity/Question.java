@@ -53,6 +53,12 @@ public class Question {
     @Column(name = "image_path", columnDefinition = "TEXT")
     private String imagePath;
 
+    @Column(name = "image_url")
+    private String imageUrl;
+
+    @Column(name = "image_alt_text", columnDefinition = "TEXT")
+    private String imageAltText;
+
 
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     @OrderBy("optionLabel ASC")

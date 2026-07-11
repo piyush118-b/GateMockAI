@@ -13,6 +13,13 @@ export default function ScorecardResult() {
   // Active question being reviewed
   const [activeIndex, setActiveIndex] = useState(0);
 
+  // Rank prediction state
+  const [rankPrediction, setRankPrediction] = useState(null);
+
+  // Lazy loaded wrong-answer explanations
+  const [lazyExplanations, setLazyExplanations] = useState({});
+  const [loadingExplanations, setLoadingExplanations] = useState({});
+
   useEffect(() => {
     fetch(`/api/student/attempts/${attemptId}/result`)
       .then(res => {
@@ -27,7 +34,33 @@ export default function ScorecardResult() {
         setError(err.message);
         setLoading(false);
       });
+
+    // Fetch Rank Prediction
+    fetch(`/api/exam/attempts/${attemptId}/rank-prediction`)
+      .then(res => {
+        if (!res.ok) throw new Error('Rank prediction fetch failed');
+        return res.json();
+      })
+      .then(json => setRankPrediction(json))
+      .catch(err => console.error('Failed to load rank prediction:', err));
   }, [attemptId]);
+
+  const fetchExplanation = async (questionId) => {
+    if (lazyExplanations[questionId] || loadingExplanations[questionId]) return;
+    
+    setLoadingExplanations(prev => ({ ...prev, [questionId]: true }));
+    try {
+      const res = await fetch(`/api/exam/attempts/${attemptId}/explanation/${questionId}`);
+      if (!res.ok) throw new Error('Explanation lookup failed');
+      const json = await res.json();
+      setLazyExplanations(prev => ({ ...prev, [questionId]: json.explanation }));
+    } catch (err) {
+      console.error(err);
+      setLazyExplanations(prev => ({ ...prev, [questionId]: 'Failed to retrieve explanation. Please try again.' }));
+    } finally {
+      setLoadingExplanations(prev => ({ ...prev, [questionId]: false }));
+    }
+  };
 
   if (loading) {
     return (
@@ -63,8 +96,6 @@ export default function ScorecardResult() {
   // Helper to determine palette color based on question review status
   const getQuestionPaletteStyle = (q) => {
     const isCorrect = q.userAnswer?.isCorrect;
-    const selected = q.userAnswer?.selectedOptionIds || q.userAnswer?.natValueEntered !== null;
-
     if (isCorrect === true) {
       return 'bg-green-500 hover:bg-green-600 text-white border-green-600';
     } else if (isCorrect === false) {
@@ -73,6 +104,28 @@ export default function ScorecardResult() {
       return 'bg-gray-400 hover:bg-gray-500 text-white border-gray-500';
     }
   };
+
+  // Time Analysis Calculation
+  let oneMarkTotalTime = 0;
+  let oneMarkCount = 0;
+  let twoMarkTotalTime = 0;
+  let twoMarkCount = 0;
+
+  if (questions) {
+    questions.forEach(q => {
+      const timeSpent = q.userAnswer?.timeSpentSeconds || 0;
+      if (q.marks === 1) {
+        oneMarkTotalTime += timeSpent;
+        oneMarkCount++;
+      } else if (q.marks === 2) {
+        twoMarkTotalTime += timeSpent;
+        twoMarkCount++;
+      }
+    });
+  }
+
+  const avgTimeOneMark = oneMarkCount > 0 ? Math.round(oneMarkTotalTime / oneMarkCount) : 0;
+  const avgTimeTwoMark = twoMarkCount > 0 ? Math.round(twoMarkTotalTime / twoMarkCount) : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col font-sans select-none">
@@ -166,6 +219,62 @@ export default function ScorecardResult() {
           </div>
         </div>
 
+        {/* RANK PREDICTION & TIME ANALYSIS DOUBLE CARD */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* RANK PREDICTION CARD */}
+          <div className="bg-gradient-to-r from-slate-900 to-indigo-950 text-white rounded-lg p-6 shadow-md border border-indigo-800 flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-indigo-300">Predicted GATE Score & Rank Range</h3>
+              {rankPrediction ? (
+                <div className="mt-4">
+                  <div className="flex justify-between items-baseline">
+                    <span className="text-3xl font-black font-mono text-cyan-400">
+                      Rank {rankPrediction.rankMin} - {rankPrediction.rankMax}
+                    </span>
+                    <span className="text-xs bg-indigo-500/30 text-indigo-200 border border-indigo-500/50 px-2 py-0.5 rounded-[4px] font-bold">
+                      {rankPrediction.category}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-300 mt-2 font-medium">
+                    Based on a normalized score of {rankPrediction.normalizedScore.toFixed(1)}/100 matching cutoffs of recent GATE CSE exams.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 flex items-center text-gray-400 text-xs">
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" /> Calculating Rank Prediction...
+                </div>
+              )}
+            </div>
+            <div className="mt-4 pt-4 border-t border-indigo-900 flex justify-between text-xs text-gray-400">
+              <span>Simulated Cutoff Bracket</span>
+              <span className="text-white font-semibold">CS Syllabus</span>
+            </div>
+          </div>
+
+          {/* TIME ANALYSIS CARD */}
+          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col justify-between">
+            <div>
+              <h3 className="text-xs font-extrabold uppercase tracking-wider text-gray-400">Question Duration Breakdown</h3>
+              <div className="grid grid-cols-2 gap-4 mt-4">
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-center">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Avg. 1-Mark Time</span>
+                  <span className="text-2xl font-black text-slate-800 font-mono mt-1 block">
+                    {avgTimeOneMark}s
+                  </span>
+                  <span className="text-[10px] text-gray-400 block mt-0.5">({oneMarkCount} Questions)</span>
+                </div>
+                <div className="bg-gray-50 border border-gray-100 rounded-lg p-4 text-center">
+                  <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Avg. 2-Mark Time</span>
+                  <span className="text-2xl font-black text-slate-800 font-mono mt-1 block">
+                    {avgTimeTwoMark}s
+                  </span>
+                  <span className="text-[10px] text-gray-400 block mt-0.5">({twoMarkCount} Questions)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* REVIEW SECTOR SPLIT */}
         <div className="flex-1 bg-white border border-gray-200 rounded-lg shadow-sm flex overflow-hidden min-h-[480px]">
           {/* LEFT REVIEW GRID PALETTE */}
@@ -216,9 +325,10 @@ export default function ScorecardResult() {
               {/* HEADER QUESTION INFO */}
               <div className="bg-slate-950 text-white px-6 py-3 flex justify-between items-center text-xs font-semibold select-none shrink-0 border-b border-gray-800">
                 <span>Question review: No. {activeQ.sequenceNo}</span>
-                <div className="flex gap-3">
+                <div className="flex gap-4">
                   <span>Type: <span className="text-cyan-400 font-bold">{activeQ.type}</span></span>
                   <span>Marks: <span className="text-green-400 font-bold">{activeQ.marks}</span></span>
+                  <span>Time Spent: <span className="text-amber-400 font-bold">{activeQ.userAnswer?.timeSpentSeconds || 0}s</span></span>
                 </div>
               </div>
 
@@ -227,9 +337,9 @@ export default function ScorecardResult() {
                 {/* QUESTION TEXT */}
                 <div className="text-base text-gray-800 leading-relaxed font-normal bg-gray-50 border border-gray-100 p-4 rounded-[4px]">
                   <LatexRenderer text={activeQ.questionText} />
-                  {activeQ.imagePath && (
+                  {(activeQ.imageUrl || activeQ.imagePath) && (
                     <div className="mt-4 border border-gray-200 rounded-[4px] p-1.5 bg-white max-w-lg">
-                      <img src={activeQ.imagePath} alt="" className="max-h-80 object-contain" />
+                      <img src={activeQ.imageUrl || activeQ.imagePath} alt={activeQ.imageAltText || ""} className="max-h-80 object-contain" />
                     </div>
                   )}
                 </div>
@@ -315,9 +425,9 @@ export default function ScorecardResult() {
 
                             <div className="flex-1 text-sm text-gray-700 pt-0.5 select-none">
                               <LatexRenderer text={opt.optionText} />
-                              {opt.imagePath && (
+                              {(opt.imageUrl || opt.imagePath) && (
                                 <div className="mt-3 border border-gray-200 rounded-[4px] p-1.5 bg-white max-w-sm">
-                                  <img src={opt.imagePath} alt="" className="max-h-48 object-contain" />
+                                  <img src={opt.imageUrl || opt.imagePath} alt="" className="max-h-48 object-contain" />
                                 </div>
                               )}
                             </div>
@@ -348,12 +458,44 @@ export default function ScorecardResult() {
                 {activeQ.explanation && (
                   <div className="mt-4 bg-slate-50 border border-slate-200 rounded-md p-5 select-none">
                     <div className="flex items-center gap-2 text-slate-800 font-extrabold text-xs uppercase tracking-wider mb-2">
-                      <BookOpen className="w-4 h-4 text-indigo-600 animate-pulse" />
+                      <BookOpen className="w-4 h-4 text-indigo-600" />
                       <span>Academic Solution & Explanation Analysis</span>
                     </div>
                     <div className="text-sm text-slate-700 leading-relaxed font-sans mt-1">
                       <LatexRenderer text={activeQ.explanation} />
                     </div>
+                  </div>
+                )}
+
+                {/* LAZY LOADED "WHY WAS I WRONG?" EXPLANATION */}
+                {activeQ.userAnswer?.isCorrect === false && (
+                  <div className="mt-4 border border-rose-200 rounded-md p-5 bg-rose-50/20 select-none">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2 text-rose-800 font-extrabold text-xs uppercase tracking-wider">
+                        <AlertCircle className="w-4 h-4 text-rose-600 animate-pulse" />
+                        <span>AI Diagnostic: Why was I wrong?</span>
+                      </div>
+                      {!lazyExplanations[activeQ.id] && !loadingExplanations[activeQ.id] && (
+                        <button
+                          type="button"
+                          onClick={() => fetchExplanation(activeQ.id)}
+                          className="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-[10px] uppercase tracking-wider px-3 py-1.5 rounded shadow-sm hover:shadow transition-all cursor-pointer"
+                        >
+                          Generate AI Diagnosis
+                        </button>
+                      )}
+                    </div>
+                    {loadingExplanations[activeQ.id] && (
+                      <div className="flex items-center gap-2 text-rose-600 text-xs py-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Analyzing your response and generating diagnostic steps...</span>
+                      </div>
+                    )}
+                    {lazyExplanations[activeQ.id] && (
+                      <div className="text-sm text-gray-700 leading-relaxed font-sans mt-1 bg-white border border-rose-100 p-4 rounded shadow-sm">
+                        <LatexRenderer text={lazyExplanations[activeQ.id]} />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -362,5 +504,5 @@ export default function ScorecardResult() {
         </div>
       </div>
     </div>
-  )
+  );
 }

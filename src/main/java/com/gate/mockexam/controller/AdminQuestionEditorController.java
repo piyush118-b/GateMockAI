@@ -92,6 +92,10 @@ public class AdminQuestionEditorController {
                 q.setNegativeMarks(new BigDecimal(payload.get("negativeMarks").toString()));
             if (payload.containsKey("imagePath"))
                 q.setImagePath((String) payload.get("imagePath"));
+            if (payload.containsKey("imageUrl"))
+                q.setImageUrl((String) payload.get("imageUrl"));
+            if (payload.containsKey("imageAltText"))
+                q.setImageAltText((String) payload.get("imageAltText"));
             if (payload.containsKey("correctNatValue") && payload.get("correctNatValue") != null)
                 q.setCorrectNatValue(Double.parseDouble(payload.get("correctNatValue").toString()));
             questionRepository.save(q);

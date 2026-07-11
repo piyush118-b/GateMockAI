@@ -37,6 +37,12 @@ public class MockTestGenerationServiceTest {
     @MockBean
     private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
 
+    @MockBean
+    private AnalyticsService analyticsService;
+
+    @MockBean
+    private com.gate.mockexam.repository.UserRepository userRepository;
+
     @org.springframework.boot.test.mock.mockito.SpyBean
     private com.gate.mockexam.repository.MockTestRepository mockTestRepository;
 

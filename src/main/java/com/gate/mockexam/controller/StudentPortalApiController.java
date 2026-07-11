@@ -167,6 +167,8 @@ public class StudentPortalApiController {
                 qMap.put("correctNatValue", q.getCorrectNatValue());
                 qMap.put("natTolerance", q.getNatTolerance());
                 qMap.put("imagePath", q.getImagePath());
+                qMap.put("imageUrl", q.getImageUrl());
+                qMap.put("imageAltText", q.getImageAltText());
 
                 List<Map<String, Object>> optionsList = q.getOptions().stream().map(o -> {
                     Map<String, Object> oMap = new HashMap<>();
@@ -188,11 +190,13 @@ public class StudentPortalApiController {
                     ansMap.put("natValueEntered", studentAns.getNatValueEntered());
                     ansMap.put("isCorrect", studentAns.getIsCorrect());
                     ansMap.put("marksAwarded", studentAns.getMarksAwarded());
+                    ansMap.put("timeSpentSeconds", studentAns.getTimeSpentSeconds() != null ? studentAns.getTimeSpentSeconds() : 0);
                 } else {
                     ansMap.put("selectedOptionIds", null);
                     ansMap.put("natValueEntered", null);
                     ansMap.put("isCorrect", null);
                     ansMap.put("marksAwarded", 0.0);
+                    ansMap.put("timeSpentSeconds", 0);
                 }
                 qMap.put("userAnswer", ansMap);
 

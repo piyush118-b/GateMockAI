@@ -4,7 +4,7 @@
     // ─────────────────────────────────────────────────────────────────
     // SPRING BOOT – Debug Mode via Maven
     // Run this to start the full backend with hot-reload (DevTools)
-    // Pre-requisite: Docker must be running (DB container must be up)
+    // Pre-requisite: Local PostgreSQL database must be running
     // ─────────────────────────────────────────────────────────────────
     {
       "type": "java",

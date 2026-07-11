@@ -129,11 +129,7 @@ public class GeminiServiceImpl implements GeminiService {
 
         try {
             String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", transcriptionModel, apiKey);
-            Map<?, ?> response = restClient.post()
-                    .uri(url)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> response = executePostWithRetry(url, requestBody);
 
             if (response != null && response.containsKey("candidates")) {
                 recordUsageHelper("INGESTION", response);
@@ -188,11 +184,7 @@ public class GeminiServiceImpl implements GeminiService {
 
         try {
             String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", generationModel, apiKey);
-            Map<?, ?> response = restClient.post()
-                    .uri(url)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> response = executePostWithRetry(url, requestBody);
 
             if (response != null && response.containsKey("candidates")) {
                 recordUsageHelper("EXPLANATION", response);
@@ -223,7 +215,8 @@ public class GeminiServiceImpl implements GeminiService {
     public String generateJsonContent(String prompt, double temperature) {
         checkApiKey();
         geminiUsageService.checkDailyLimit();
-        log.info("Sending prompt to Gemini ({}) for JSON content generation with temperature {}", generationModel, temperature);
+        log.info("Sending prompt to Gemini ({}) for JSON content generation with temperature {}. maxOutputTokens={}", 
+            generationModel, temperature, maxOutputTokensGeneration);
 
         Map<String, Object> requestBody = Map.of(
             "contents", List.of(
@@ -242,11 +235,7 @@ public class GeminiServiceImpl implements GeminiService {
 
         try {
             String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", generationModel, apiKey);
-            Map<?, ?> response = restClient.post()
-                    .uri(url)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> response = executePostWithRetry(url, requestBody);
 
             if (response != null && response.containsKey("candidates")) {
                 recordUsageHelper("GENERATION", response);
@@ -340,11 +329,7 @@ public class GeminiServiceImpl implements GeminiService {
 
         try {
             String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", generationModel, apiKey);
-            Map<?, ?> response = restClient.post()
-                    .uri(url)
-                    .body(requestBody)
-                    .retrieve()
-                    .body(Map.class);
+            Map<?, ?> response = executePostWithRetry(url, requestBody);
 
             if (response != null && response.containsKey("candidates")) {
                 recordUsageHelper("GENERATION", response);
@@ -366,6 +351,64 @@ public class GeminiServiceImpl implements GeminiService {
         }
     }
 
+    @Override
+    public String callGeminiWithImage(String prompt, byte[] imageBytes, String mimeType) {
+        checkApiKey();
+        geminiUsageService.checkDailyLimit();
+        log.info("Sending prompt and image to Gemini ({}) for multimodal content generation", generationModel);
+
+        List<Map<String, Object>> parts = new ArrayList<>();
+
+        // Text part first
+        parts.add(Map.of("text", prompt));
+
+        // Image part (inline base64)
+        if (imageBytes != null) {
+            String base64Data = Base64.getEncoder().encodeToString(imageBytes);
+            parts.add(Map.of(
+                "inlineData", Map.of(
+                    "mimeType", mimeType, // "image/png" or "image/jpeg"
+                    "data", base64Data
+                )
+            ));
+            parts.add(Map.of("text",
+                "The image above is directly relevant to this question. " +
+                "Generate questions that explicitly reference elements visible in this diagram."
+            ));
+        }
+
+        Map<String, Object> requestBody = Map.of(
+            "contents", List.of(Map.of("parts", parts)),
+            "generationConfig", Map.of(
+                "temperature", 0.7,
+                "maxOutputTokens", maxOutputTokensGeneration
+            )
+        );
+
+        try {
+            String url = String.format("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", generationModel, apiKey);
+            Map<?, ?> response = executePostWithRetry(url, requestBody);
+
+            if (response != null && response.containsKey("candidates")) {
+                recordUsageHelper("GENERATION", response);
+                List<?> candidates = (List<?>) response.get("candidates");
+                if (!candidates.isEmpty()) {
+                    Map<?, ?> candidate = (Map<?, ?>) candidates.get(0);
+                    Map<?, ?> content = (Map<?, ?>) candidate.get("content");
+                    List<?> partsResponse = (List<?>) content.get("parts");
+                    if (!partsResponse.isEmpty()) {
+                        Map<?, ?> part = (Map<?, ?>) partsResponse.get(0);
+                        return (String) part.get("text");
+                    }
+                }
+            }
+            throw new RuntimeException("Empty or invalid response from Gemini API");
+        } catch (Exception e) {
+            log.error("Failed to call Gemini API with image: {}", e.getMessage(), e);
+            throw new RuntimeException("Gemini multimodal generation failed: " + e.getMessage());
+        }
+    }
+
     private void recordUsageHelper(String callType, Map<?, ?> response) {
         try {
             if (response != null && response.containsKey("usageMetadata")) {
@@ -377,5 +420,44 @@ public class GeminiServiceImpl implements GeminiService {
         } catch (Exception e) {
             log.warn("Failed to extract or record Gemini token usage: {}", e.getMessage());
         }
+    }
+
+    private Map<?, ?> executePostWithRetry(String url, Map<String, Object> requestBody) {
+        int maxAttempts = 5;
+        long backoffMs = 1500; // start with 1.5 seconds
+
+        for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+            try {
+                Map<?, ?> response = restClient.post()
+                        .uri(url)
+                        .body(requestBody)
+                        .retrieve()
+                        .body(Map.class);
+                if (response != null) {
+                    return response;
+                }
+            } catch (org.springframework.web.client.HttpClientErrorException.TooManyRequests e) {
+                log.warn("Gemini API rate limit (429) hit on attempt {}/{}. Backing off for {} ms...", 
+                    attempt, maxAttempts, backoffMs);
+                if (attempt == maxAttempts) throw e;
+            } catch (org.springframework.web.client.HttpStatusCodeException e) {
+                log.warn("Gemini API returned status {} on attempt {}/{}. Backing off for {} ms...", 
+                    e.getStatusCode(), attempt, maxAttempts, backoffMs);
+                if (attempt == maxAttempts) throw e;
+            } catch (Exception e) {
+                log.warn("Gemini API call failed with exception: {} on attempt {}/{}. Backing off for {} ms...", 
+                    e.getMessage(), attempt, maxAttempts, backoffMs);
+                if (attempt == maxAttempts) throw new RuntimeException(e);
+            }
+
+            try {
+                Thread.sleep(backoffMs);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                throw new RuntimeException("API retry interrupted", ie);
+            }
+            backoffMs *= 2; // exponential backoff
+        }
+        throw new RuntimeException("Failed to get response from Gemini API after 5 attempts");
     }
 }

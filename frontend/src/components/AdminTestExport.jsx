@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 
 export default function AdminTestExport() {
   const { testId } = useParams()
+  const navigate = useNavigate()
   const [test, setTest] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -32,7 +33,13 @@ export default function AdminTestExport() {
           🖨 Save as PDF
         </button>
         <button
-          onClick={() => window.history.back()}
+          onClick={() => {
+            if (window.history.state && window.history.state.idx > 0) {
+              navigate(-1)
+            } else {
+              navigate(`/admin/tests/${testId}/edit`)
+            }
+          }}
           style={{ background: '#f1f5f9', color: '#1e3a8a', border: '1px solid #cbd5e1', padding: '0.6rem 1rem', borderRadius: 8, cursor: 'pointer' }}
         >
           ← Back

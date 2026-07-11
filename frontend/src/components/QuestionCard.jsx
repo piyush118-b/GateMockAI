@@ -123,12 +123,12 @@ export default function QuestionCard() {
           <LatexRenderer text={activeQ.questionText} />
 
           {/* QUESTION IMAGE DIAGRAM */}
-          {activeQ.imagePath && (
+          {(activeQ.imageUrl || activeQ.imagePath) && (
             <div className="mt-4 max-w-lg inline-block">
               <img 
-                src={activeQ.imagePath} 
-                alt={`Question diagram ${activeQ.sequenceNo}`} 
-                className="max-h-80 object-contain"
+                src={activeQ.imageUrl || activeQ.imagePath} 
+                alt={activeQ.imageAltText || `Question diagram ${activeQ.sequenceNo}`} 
+                className="max-h-80 object-contain border border-gray-200 rounded shadow-sm"
               />
             </div>
           )}

@@ -65,6 +65,10 @@ export default function StudentDashboard() {
   const [rankData, setRankData] = useState(null);
   const [rankLoading, setRankLoading] = useState(false);
 
+  // Spaced Repetition States
+  const [dueCount, setDueCount] = useState(0);
+  const [generatingRevision, setGeneratingRevision] = useState(false);
+
   // Helper: Convert total time spent minutes to 'Xh Ym' format
   const formatTimeSpent = (totalMins) => {
     if (!totalMins || totalMins <= 0) return '0h 0m';
@@ -122,6 +126,36 @@ export default function StudentDashboard() {
         setLoading(false);
       });
   }, [navigate]);
+
+  // Fetch due count on mount
+  useEffect(() => {
+    fetch('/api/exam/revision/due-count')
+      .then(res => res.json())
+      .then(json => setDueCount(json.dueCount || 0))
+      .catch(err => console.error('Failed to load due count:', err));
+  }, []);
+
+  const handleStartRevision = async () => {
+    if (generatingRevision) return;
+    setGeneratingRevision(true);
+    try {
+      const res = await fetch('/api/exam/revision/generate', {
+        method: 'POST'
+      });
+      if (!res.ok) throw new Error('Failed to generate revision test');
+      const data = await res.json();
+      if (data.mockTestId) {
+        navigate(`/student/tests/${data.mockTestId}/take`);
+      } else {
+        alert(data.message || 'No questions due today!');
+      }
+    } catch (err) {
+      console.error(err);
+      alert('Error generating revision test. Please try again.');
+    } finally {
+      setGeneratingRevision(false);
+    }
+  };
 
   // Fetch Score Timeline (Section 2 - Left Panel)
   useEffect(() => {
@@ -336,6 +370,41 @@ export default function StudentDashboard() {
       {/* DASHBOARD BODY */}
       <main className="max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6 flex-1">
         
+        {/* REVISION SESSION ALERT CARD */}
+        {dueCount > 0 && (
+          <div className="bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-lg p-5 shadow-md flex flex-col sm:flex-row justify-between items-center gap-4 animate-fadeIn border border-orange-500">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/20 p-2.5 rounded-full shrink-0">
+                <BookOpen className="w-6 h-6 text-white animate-pulse" />
+              </div>
+              <div>
+                <h4 className="text-sm font-black uppercase tracking-wider">Revision Session Due</h4>
+                <p className="text-xs text-white/95 mt-1 font-medium">
+                  You have <span className="font-extrabold text-white bg-white/20 px-2 py-0.5 rounded">{dueCount} questions</span> scheduled for spaced repetition review today.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleStartRevision}
+              disabled={generatingRevision}
+              className="bg-white hover:bg-orange-50 text-orange-700 font-extrabold text-xs uppercase tracking-wider px-5 py-3 rounded shadow hover:shadow-md transition-all shrink-0 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              {generatingRevision ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <PlayCircle className="w-4 h-4" />
+                  Start Revision Session
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
         {/* SECTION 1 — MY KPI BAR */}
         <div className="grid grid-cols-1 sm:grid-cols-5 gap-5">
           {/* Card 1: Tests Taken */}
@@ -624,7 +693,7 @@ export default function StudentDashboard() {
                             </Link>
                           ) : (
                             <Link
-                              to={`/student/tests/${att.attemptId}/take`}
+                              to={`/student/tests/${att.testId}/take`}
                               className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs uppercase px-3.5 py-1.5 rounded shadow transition-all duration-150"
                             >
                               Resume Exam

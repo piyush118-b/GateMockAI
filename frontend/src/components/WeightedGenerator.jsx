@@ -28,9 +28,7 @@ export default function WeightedGenerator() {
           const initial = {};
           const firstBranch = json[0];
           firstBranch.subjects.forEach((subj) => {
-            // Distribute 72 marks roughly across CS topics:
-            // 8 subjects * 9 marks = 72 marks
-            initial[subj.name] = 8;
+            initial[subj.name] = subj.defaultMarksWeightage;
           });
           setWeightages(initial);
         }
@@ -57,7 +55,7 @@ export default function WeightedGenerator() {
     const targetBranch = branches[idx];
     const initial = {};
     targetBranch.subjects.forEach((subj) => {
-      initial[subj.name] = 8;
+      initial[subj.name] = subj.defaultMarksWeightage;
     });
     setWeightages(initial);
   };
@@ -67,7 +65,11 @@ export default function WeightedGenerator() {
   // Engineering Math = 13 Marks (or core math)
   // Remaining Core Topics = 72 Marks
   // Total = 100 Marks!
-  const coreTotal = Object.values(weightages).reduce((a, b) => a + b, 0);
+  const coreSubjects = activeBranch ? activeBranch.subjects.filter(
+    s => s.name !== "General Aptitude" && s.name !== "Engineering Mathematics"
+  ) : [];
+
+  const coreTotal = coreSubjects.reduce((sum, subj) => sum + (weightages[subj.name] || 0), 0);
   const totalMarks = coreTotal + 15 + 13; 
 
   const isMarksValid = coreTotal === 72;
@@ -79,7 +81,13 @@ export default function WeightedGenerator() {
       return;
     }
 
-    const weightagesJson = JSON.stringify(weightages);
+    const finalWeightages = {
+      ...weightages,
+      "General Aptitude": 15,
+      "Engineering Mathematics": 13
+    };
+
+    const weightagesJson = JSON.stringify(finalWeightages);
     const query = new URLSearchParams({
       branchCode: activeBranch.code,
       yearLabel: yearLabel,
@@ -228,7 +236,7 @@ export default function WeightedGenerator() {
               </div>
 
               <div className="flex flex-col gap-6">
-                {activeBranch.subjects.map((subj) => {
+                {coreSubjects.map((subj) => {
                   const val = weightages[subj.name] || 0;
                   
                   return (

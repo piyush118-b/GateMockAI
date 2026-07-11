@@ -9,6 +9,8 @@ export const useExamStore = create((set, get) => ({
   questionStates: [], // 'NOT_VISITED', 'NOT_ANSWERED', 'ANSWERED', 'MARKED', 'MARKED_ANSWERED'
   answersCache: {}, // { questionId: value }
   timeLeft: 10800, // seconds (3 hours default)
+  timeSpentMap: {}, // { questionId: seconds }
+  activeQuestionStartTime: null,
   fullscreenViolationsCount: 0,
   isFullscreenOverlayActive: false,
   isSubmitModalActive: false,
@@ -37,10 +39,12 @@ export const useExamStore = create((set, get) => ({
       // Construct initial palette states and fill from cached answers
       const initialStates = new Array(totalCount).fill('NOT_VISITED');
       const initialCache = {};
+      const initialTimeMap = {};
       
       // Populate already saved answers from database
       if (sessionData.savedAnswers) {
         sessionData.savedAnswers.forEach(ans => {
+          initialTimeMap[ans.questionId] = ans.timeSpentSeconds || 0;
           if (ans.natValueEntered !== null) {
             initialCache[ans.questionId] = String(ans.natValueEntered);
             initialStates[ans.sequenceNo - 1] = 'ANSWERED';
@@ -62,14 +66,33 @@ export const useExamStore = create((set, get) => ({
         questions: questionsData,
         timeLeft: sessionData.timeLeftSeconds,
         answersCache: initialCache,
+        timeSpentMap: initialTimeMap,
         questionStates: initialStates,
         activeQuestionIndex: 0,
         activeSection: 0,
+        activeQuestionStartTime: Date.now(),
         isLoaded: true
       });
     } catch (err) {
       set({ error: err.message, isLoaded: false });
     }
+  },
+
+  // Record time spent on the active question
+  recordTimeSpent: () => {
+    const { activeQuestionStartTime, activeQuestionIndex, questions, timeSpentMap } = get();
+    if (!activeQuestionStartTime) return;
+    const activeQ = questions[activeQuestionIndex];
+    if (!activeQ) return;
+
+    const elapsed = Math.round((Date.now() - activeQuestionStartTime) / 1000);
+    const updatedMap = { ...timeSpentMap };
+    updatedMap[activeQ.id] = (updatedMap[activeQ.id] || 0) + elapsed;
+
+    set({
+      timeSpentMap: updatedMap,
+      activeQuestionStartTime: Date.now()
+    });
   },
 
   // Save intermediate responses to server dynamically
@@ -136,8 +159,10 @@ export const useExamStore = create((set, get) => ({
 
   // Jump directly to a question
   jumpToQuestion: (index) => {
-    const { questions, questionStates } = get();
+    const { questions, questionStates, recordTimeSpent } = get();
     if (index < 0 || index >= questions.length) return;
+
+    recordTimeSpent();
 
     const newStates = [...questionStates];
     if (newStates[index] === 'NOT_VISITED') {
@@ -157,19 +182,20 @@ export const useExamStore = create((set, get) => ({
 
   // Save selection and jump to next
   saveAndNext: async () => {
-    const { activeQuestionIndex, questions, saveActiveResponse, jumpToQuestion } = get();
+    const { activeQuestionIndex, questions, saveActiveResponse, jumpToQuestion, recordTimeSpent } = get();
     await saveActiveResponse();
     
     if (activeQuestionIndex < questions.length - 1) {
       jumpToQuestion(activeQuestionIndex + 1);
     } else {
+      recordTimeSpent();
       set({ isSubmitModalActive: true });
     }
   },
 
   // Toggle purple marked for review state
   markForReviewAndNext: async () => {
-    const { activeQuestionIndex, questions, answersCache, test, jumpToQuestion } = get();
+    const { activeQuestionIndex, questions, answersCache, test, jumpToQuestion, recordTimeSpent } = get();
     const activeQ = questions[activeQuestionIndex];
     if (!activeQ) return;
 
@@ -197,6 +223,8 @@ export const useExamStore = create((set, get) => ({
 
     if (activeQuestionIndex < questions.length - 1) {
       jumpToQuestion(activeQuestionIndex + 1);
+    } else {
+      recordTimeSpent();
     }
   },
 
@@ -213,16 +241,19 @@ export const useExamStore = create((set, get) => ({
 
   // Submit secure attempt
   submitExam: async (isTimeout = false) => {
-    const { test, answersCache, isSubmitting } = get();
+    const { test, questions, answersCache, timeSpentMap, isSubmitting, recordTimeSpent } = get();
     if (isSubmitting) return;
+
+    recordTimeSpent();
 
     set({ isSubmitting: true });
 
     try {
-      // Map cached values into flat responses array
-      const responsesList = Object.keys(answersCache).map(qId => ({
-        questionId: qId,
-        response: answersCache[qId]
+      // Map all questions to the responses list, including timeSpentSeconds
+      const responsesList = questions.map(q => ({
+        questionId: q.id,
+        response: answersCache[q.id] || "",
+        timeSpentSeconds: timeSpentMap[q.id] || 0
       }));
 
       const res = await fetch(`/api/exam/${test.id}/submit`, {

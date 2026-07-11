@@ -4,6 +4,9 @@ import com.gate.mockexam.entity.*;
 import com.gate.mockexam.enums.AttemptStatus;
 import com.gate.mockexam.enums.QuestionType;
 import com.gate.mockexam.repository.*;
+import com.gate.mockexam.service.SpacedRepetitionService;
+import com.gate.mockexam.service.GateRankPredictor;
+import com.gate.mockexam.service.ExplanationService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -25,18 +28,27 @@ public class ExamApiController {
     private final AttemptRepository attemptRepository;
     private final AttemptAnswerRepository attemptAnswerRepository;
     private final UserRepository userRepository;
+    private final SpacedRepetitionService spacedRepetitionService;
+    private final GateRankPredictor gateRankPredictor;
+    private final ExplanationService explanationService;
 
     public ExamApiController(
             MockTestRepository mockTestRepository,
             QuestionRepository questionRepository,
             AttemptRepository attemptRepository,
             AttemptAnswerRepository attemptAnswerRepository,
-            UserRepository userRepository) {
+            UserRepository userRepository,
+            SpacedRepetitionService spacedRepetitionService,
+            GateRankPredictor gateRankPredictor,
+            ExplanationService explanationService) {
         this.mockTestRepository = mockTestRepository;
         this.questionRepository = questionRepository;
         this.attemptRepository = attemptRepository;
         this.attemptAnswerRepository = attemptAnswerRepository;
         this.userRepository = userRepository;
+        this.spacedRepetitionService = spacedRepetitionService;
+        this.gateRankPredictor = gateRankPredictor;
+        this.explanationService = explanationService;
     }
 
     @GetMapping("/{testId}/session")
@@ -252,13 +264,28 @@ public class ExamApiController {
                     .orElseThrow(() -> new IllegalStateException("No active in-progress test attempt found"));
 
             List<Question> questions = questionRepository.findByTestIdOrderBySequenceNoAsc(testId);
-            List<Map<String, String>> responses = (List<Map<String, String>>) body.get("responses");
+            List<Map<String, ?>> responses = (List<Map<String, ?>>) body.get("responses");
 
             // Build a fast lookup map from request responses
             Map<String, String> responseMap = new HashMap<>();
+            Map<String, Integer> timeSpentMap = new HashMap<>();
             if (responses != null) {
-                for (Map<String, String> resp : responses) {
-                    responseMap.put(resp.get("questionId"), resp.get("response"));
+                for (Map<String, ?> resp : responses) {
+                    String qId = String.valueOf(resp.get("questionId"));
+                    responseMap.put(qId, (String) resp.get("response"));
+                    
+                    Object tSpent = resp.get("timeSpentSeconds");
+                    if (tSpent instanceof Number) {
+                        timeSpentMap.put(qId, ((Number) tSpent).intValue());
+                    } else if (tSpent instanceof String) {
+                        try {
+                            timeSpentMap.put(qId, Integer.parseInt((String) tSpent));
+                        } catch (NumberFormatException e) {
+                            timeSpentMap.put(qId, 0);
+                        }
+                    } else {
+                        timeSpentMap.put(qId, 0);
+                    }
                 }
             }
 
@@ -280,6 +307,8 @@ public class ExamApiController {
                 }
 
                 String responseVal = responseMap.get(question.getId().toString());
+                Integer tSpent = timeSpentMap.getOrDefault(question.getId().toString(), 0);
+                answer.setTimeSpentSeconds(tSpent);
 
                 if (question.getType() == QuestionType.MCQ) {
                     if (responseVal != null && !responseVal.isBlank()) {
@@ -347,11 +376,11 @@ public class ExamApiController {
                             double tolerance = question.getNatTolerance() != null ? question.getNatTolerance() : 0.01;
 
                             if (Math.abs(enteredVal - correctVal) <= tolerance) {
-                                answer.setIsCorrect(true);
-                                answer.setMarksAwarded(question.getMarks());
+                                  answer.setIsCorrect(true);
+                                  answer.setMarksAwarded(question.getMarks());
                             } else {
-                                answer.setIsCorrect(false);
-                                answer.setMarksAwarded(BigDecimal.ZERO);
+                                  answer.setIsCorrect(false);
+                                  answer.setMarksAwarded(BigDecimal.ZERO);
                             }
                         } catch (NumberFormatException e) {
                             answer.setNatValueEntered(null);
@@ -368,6 +397,11 @@ public class ExamApiController {
                 }
 
                 totalScore = totalScore.add(answer.getMarksAwarded());
+                
+                // Change 9: update spaced repetition SM-2 schedule
+                int quality = spacedRepetitionService.toQuality(answer);
+                spacedRepetitionService.updateSchedule(answer, quality);
+
                 answersToSave.add(answer);
             }
 
@@ -390,5 +424,77 @@ public class ExamApiController {
             log.error("Failed to submit attempt via REST: {}", e.getMessage(), e);
             return ResponseEntity.status(500).body("Error submitting exam: " + e.getMessage());
         }
+    }
+
+    @GetMapping("/attempts/{attemptId}/explanation/{questionId}")
+    public ResponseEntity<Map<String, String>> getExplanation(
+            @PathVariable("attemptId") UUID attemptId,
+            @PathVariable("questionId") UUID questionId) {
+
+        List<AttemptAnswer> answers = attemptAnswerRepository.findByAttemptId(attemptId);
+        AttemptAnswer aa = answers.stream()
+                .filter(a -> a.getQuestion().getId().equals(questionId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("AttemptAnswer not found"));
+
+        String studentAnswer = "";
+        if (aa.getQuestion().getType() == QuestionType.MCQ || aa.getQuestion().getType() == QuestionType.MSQ) {
+            studentAnswer = aa.getSelectedOptionIds() != null ? aa.getSelectedOptionIds() : "Unanswered";
+        } else if (aa.getQuestion().getType() == QuestionType.NAT) {
+            studentAnswer = aa.getNatValueEntered() != null ? String.valueOf(aa.getNatValueEntered()) : "Unanswered";
+        }
+
+        String correctAnswer = "";
+        if (aa.getQuestion().getType() == QuestionType.MCQ || aa.getQuestion().getType() == QuestionType.MSQ) {
+            correctAnswer = aa.getQuestion().getOptions().stream()
+                    .filter(Option::isCorrect)
+                    .map(o -> o.getOptionLabel() + ": " + o.getOptionText())
+                    .collect(Collectors.joining(", "));
+        } else if (aa.getQuestion().getType() == QuestionType.NAT) {
+            correctAnswer = String.valueOf(aa.getQuestion().getCorrectNatValue());
+        }
+
+        String explanation = explanationService.getExplanation(
+            aa.getQuestion(), studentAnswer, correctAnswer
+        );
+
+        return ResponseEntity.ok(Map.of("explanation", explanation));
+    }
+
+    @GetMapping("/attempts/{attemptId}/rank-prediction")
+    public ResponseEntity<GateRankPredictor.RankPrediction> getRankPrediction(
+            @PathVariable("attemptId") UUID attemptId) {
+        Attempt attempt = attemptRepository.findById(attemptId).orElseThrow();
+        GateRankPredictor.RankPrediction prediction = gateRankPredictor.predict(
+            attempt.getScore() != null ? attempt.getScore().doubleValue() : 0.0,
+            attempt.getTest().getTotalMarks() != null ? attempt.getTest().getTotalMarks().doubleValue() : 100.0
+        );
+        return ResponseEntity.ok(prediction);
+    }
+
+    @PostMapping("/revision/generate")
+    public ResponseEntity<?> generateRevisionTest(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body("Unauthorized");
+        }
+        User user = userRepository.findByEmail(principal.getName()).orElseThrow();
+        MockTest revision = spacedRepetitionService.generateRevisionTest(user.getId());
+        if (revision == null) {
+            return ResponseEntity.ok(Map.of("message", "No questions due for review today. Great job!"));
+        }
+        return ResponseEntity.ok(Map.of("mockTestId", revision.getId().toString(), "questionCount", revision.getQuestions().size()));
+    }
+
+    @GetMapping("/revision/due-count")
+    public ResponseEntity<Map<String, Integer>> getDueCount(Principal principal) {
+        if (principal == null) {
+            return ResponseEntity.status(401).body(Map.of("dueCount", 0));
+        }
+        User user = userRepository.findByEmail(principal.getName()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.ok(Map.of("dueCount", 0));
+        }
+        int count = attemptAnswerRepository.findDueForReview(user.getId(), java.time.LocalDate.now()).size();
+        return ResponseEntity.ok(Map.of("dueCount", count));
     }
 }

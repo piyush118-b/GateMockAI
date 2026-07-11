@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record AttemptHistoryEntryDto(
     UUID attemptId,
+    UUID testId,
     String testTitle,
     double score,
     double totalMarks,

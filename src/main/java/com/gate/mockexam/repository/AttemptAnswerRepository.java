@@ -16,4 +16,12 @@ public interface AttemptAnswerRepository extends JpaRepository<AttemptAnswer, UU
            "JOIN FETCH aa.attempt att " +
            "WHERE att.user.id = :userId AND att.status = com.gate.mockexam.enums.AttemptStatus.SUBMITTED")
     List<AttemptAnswer> findSubmittedAnswersByUserId(@org.springframework.data.repository.query.Param("userId") UUID userId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT DISTINCT aa FROM AttemptAnswer aa " +
+           "JOIN aa.attempt a " +
+           "WHERE a.user.id = :userId " +
+           "AND aa.nextReview <= :today " +
+           "AND aa.marksAwarded <= 0 " +
+           "ORDER BY aa.nextReview ASC")
+    List<AttemptAnswer> findDueForReview(@org.springframework.data.repository.query.Param("userId") UUID userId, @org.springframework.data.repository.query.Param("today") java.time.LocalDate today);
 }
