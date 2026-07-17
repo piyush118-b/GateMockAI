@@ -1,14 +1,19 @@
 package com.gate.mockexam.dto;
 
-import lombok.*;
+import lombok.Data;
+import lombok.Builder;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.util.List;
 
+/** Summary of Gemini token usage for today */
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class GeminiUsageSummaryDTO {
+
     private LocalDate date;
     private int totalTokens;
     private int inputTokens;

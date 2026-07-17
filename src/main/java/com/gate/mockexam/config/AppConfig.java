@@ -1,45 +1,33 @@
 package com.gate.mockexam.config;
 
-
-import org.springframework.ai.ollama.api.OllamaApi;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
-import org.springframework.web.client.RestClient;
+import org.springframework.scheduling.annotation.EnableAsync;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.Executor;
 
+/**
+ * Application-level configuration.
+ * Enables @Async for Pipeline 2 (AI Enrichment) async execution.
+ */
 @Configuration
+@EnableAsync
 public class AppConfig {
 
-    @Value("${spring.ai.ollama.base-url:http://localhost:11434}")
-    private String ollamaBaseUrl;
-
-    @Bean
-    public OllamaApi ollamaApi(RestClient.Builder restClientBuilder) {
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(30000); // 30 seconds
-        factory.setReadTimeout(600000);  // 10 minutes
-        
-        RestClient.Builder customizedBuilder = restClientBuilder.clone().requestFactory(factory);
-        
-        return OllamaApi.builder()
-            .baseUrl(ollamaBaseUrl)
-            .restClientBuilder(customizedBuilder)
-            .build();
-    }
-
     /**
-     * Fixed thread pool for parallel Ollama chunk calls.
-     * Size of 3 matches the Semaphore permit count in AdminRagController —
-     * prevents VRAM OOM while still cutting ingestion time ~3x.
+     * Thread pool for Pipeline 2 async enrichment tasks.
+     * Core pool = 2 (keeps Gemini API concurrency low to avoid rate limits).
+     * Max pool  = 5 for burst capacity.
      */
-    @Bean(name = "ollamaChunkExecutor", destroyMethod = "shutdown")
-    public ExecutorService ollamaChunkExecutor() {
-        return Executors.newFixedThreadPool(3);
+    @Bean(name = "pipelineExecutor")
+    public Executor pipelineExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(5);
+        executor.setQueueCapacity(100);
+        executor.setThreadNamePrefix("pipeline-");
+        executor.initialize();
+        return executor;
     }
-
-
 }

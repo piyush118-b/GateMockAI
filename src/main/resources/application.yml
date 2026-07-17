@@ -11,8 +11,8 @@ spring:
       - org.springframework.ai.autoconfigure.ollama.OllamaAutoConfiguration
   servlet:
     multipart:
-      max-file-size: 50MB
-      max-request-size: 50MB
+      max-file-size: 100MB
+      max-request-size: 100MB
   session:
     store-type: jdbc
     jdbc:
@@ -59,18 +59,7 @@ logging:
     root: INFO
     com.gate: DEBUG
 
-# Vector store persistence path
-gate:
-  rag:
-    vector-store-path: ./data/vector-store.json
-    seed-questions-path: classpath:rag/seed_questions.json
-    auto-ingest-on-startup: true
-
-# TRACK 3: HyDE + Multi-query fusion toggle.
-# Set to false to fall back to bare single-topic cosine search.
-hyde:
-  enabled: true
-
+# ─── Gemini AI (used ONLY for AI Enrichment Pipeline workers) ──────────────
 gemini:
   api:
     key: ${GEMINI_API_KEY}
@@ -78,10 +67,21 @@ gemini:
     daily-token-limit: 500000
     warn-threshold: 400000
   model:
-    transcription: gemini-2.5-flash
     generation: gemini-2.5-flash
     max-output-tokens:
-      ingestion: 65536
       generation: 8192
     temperature:
-      ingestion: 0.0
+      generation: 0.3
+
+# ─── MinIO Object Storage ────────────────────────────────────────────────────
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket: gate-assets
+
+# ─── Pipeline 1: Python Extraction Microservice ──────────────────────────────
+extraction:
+  service:
+    url: http://localhost:8090
+    timeout-seconds: 120

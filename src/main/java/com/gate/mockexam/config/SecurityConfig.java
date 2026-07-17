@@ -37,7 +37,7 @@ public class SecurityConfig {
                 )
             )
             .authorizeHttpRequests(auth -> auth
-                // Static SPA assets — always public
+                // Static assets — always public
                 .requestMatchers(
                     "/login", "/register",
                     "/css/**", "/js/**",
@@ -46,13 +46,8 @@ public class SecurityConfig {
                 ).permitAll()
                 // Public REST endpoints
                 .requestMatchers("/api/register").permitAll()
-                // Admin routes
-                .requestMatchers("/api/admin/**", "/admin/**").hasRole("ADMIN")
-                // Student routes
-                .requestMatchers(
-                    "/api/exam/**", "/api/student/**",
-                    "/student/**", "/exam/**", "/dashboard/**", "/results/**"
-                ).hasRole("STUDENT")
+                // Admin routes — includes pipeline API
+                .requestMatchers("/api/admin/**", "/api/pipeline/**", "/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .formLogin(form -> form
