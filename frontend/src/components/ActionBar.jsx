@@ -8,18 +8,14 @@ export default function ActionBar() {
     clearActiveResponse
   } = useExamStore()
 
-  const handleSubmitTrigger = () => {
-    useExamStore.setState({ isSubmitModalActive: true });
-  }
-
   return (
-    <footer className="bg-[#f5f5f5] border-t border-gray-300 px-4 py-2 flex justify-between items-center select-none shrink-0 font-sans">
+    <footer className="bg-white border-t border-gray-300 px-4 py-2.5 flex justify-between items-center select-none shrink-0 font-sans h-[52px]">
       {/* LEFT BLOCK: MARK & CLEAR */}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={markForReviewAndNext}
-          className="bg-white border border-gray-400 hover:bg-gray-50 text-gray-800 font-semibold py-1.5 px-3 rounded-sm shadow-sm cursor-pointer text-xs"
+          className="bg-white border border-gray-300 hover:bg-gray-50 text-[#333] font-medium py-1.5 px-4 rounded-sm shadow-sm cursor-pointer text-xs transition-colors"
         >
           Mark for Review & Next
         </button>
@@ -27,30 +23,23 @@ export default function ActionBar() {
         <button
           type="button"
           onClick={clearActiveResponse}
-          className="bg-white border border-gray-400 hover:bg-gray-50 text-gray-800 font-semibold py-1.5 px-3 rounded-sm shadow-sm cursor-pointer text-xs"
+          className="bg-white border border-gray-300 hover:bg-gray-50 text-[#333] font-medium py-1.5 px-4 rounded-sm shadow-sm cursor-pointer text-xs transition-colors"
         >
           Clear Response
         </button>
       </div>
 
-      {/* RIGHT BLOCK: SAVE & SUBMIT */}
+      {/* RIGHT BLOCK: SAVE & NEXT */}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={saveAndNext}
-          className="bg-[#337ab7] border border-[#2e6da4] hover:bg-[#286090] text-white font-semibold py-1.5 px-6 rounded-sm shadow-sm cursor-pointer text-xs"
+          className="bg-[#0070a4] border border-[#005882] hover:bg-[#005c89] text-white font-bold py-1.5 px-6 rounded-sm shadow-sm cursor-pointer text-xs transition-colors"
         >
           Save & Next
-        </button>
-
-        <button
-          type="button"
-          onClick={handleSubmitTrigger}
-          className="bg-[#5bc0de] border border-[#46b8da] hover:bg-[#31b0d5] text-white font-semibold py-1.5 px-4 rounded-sm shadow-sm cursor-pointer text-xs ml-4"
-        >
-          Submit
         </button>
       </div>
     </footer>
   )
 }
+

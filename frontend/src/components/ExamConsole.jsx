@@ -8,6 +8,8 @@ import Sidebar from './Sidebar'
 import FullscreenGuard from './FullscreenGuard'
 import SubmitModal from './SubmitModal'
 import Calculator from './Calculator'
+import QuestionPaperModal from './QuestionPaperModal'
+import InstructionsModal from './InstructionsModal'
 import { Loader2 } from 'lucide-react'
 
 export default function ExamConsole() {
@@ -79,10 +81,12 @@ export default function ExamConsole() {
 
   return (
     <div className="h-screen w-screen flex flex-col overflow-hidden bg-white font-sans select-none relative">
-      {/* Proctor Fullscreen and Submission overlays */}
+      {/* Proctor Fullscreen, Calculator, and Modal overlays */}
       <FullscreenGuard />
       <SubmitModal />
       <Calculator />
+      <QuestionPaperModal />
+      <InstructionsModal />
 
       {/* NTA HEADER PANEL (BAND 1 & 2) */}
       <NtaHeader title="CS 1 Computer Science and Information Technology Mock" />
@@ -100,6 +104,12 @@ export default function ExamConsole() {
         {/* RIGHT COLUMN: PALETTE & CANDIDATE BIO (17%) */}
         <Sidebar />
       </div>
+
+      {/* BOTTOM VERSION BAR */}
+      <div className="h-[22px] bg-[#5e7d9b] text-white text-[11px] flex items-center justify-center border-t border-gray-400 font-bold shrink-0 select-none">
+        Version : 17.07.00
+      </div>
     </div>
   )
 }
+

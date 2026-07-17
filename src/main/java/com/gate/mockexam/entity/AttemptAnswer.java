@@ -38,18 +38,22 @@ public class AttemptAnswer {
     @Column(name = "marks_awarded")
     private BigDecimal marksAwarded;
 
+    @Builder.Default
     @Column(name = "time_spent_seconds", nullable = false)
     private Integer timeSpentSeconds = 0;
 
+    @Builder.Default
     @Column(name = "ease_factor", nullable = false)
     private Double easeFactor = 2.5;
 
+    @Builder.Default
     @Column(name = "interval_days", nullable = false)
     private Integer intervalDays = 1;
 
     @Column(name = "next_review")
     private java.time.LocalDate nextReview;
 
+    @Builder.Default
     @Column(name = "repetitions", nullable = false)
     private Integer repetitions = 0;
 }

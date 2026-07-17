@@ -578,7 +578,10 @@ public class AnalyticsService {
 
         List<Object[]> bestScores = attemptRepository.getBestScoresByStudentForTest(testId);
         List<Map.Entry<UUID, Double>> sortedScores = bestScores.stream()
-                .map(row -> Map.entry((UUID) row[0], ((Double) row[1])))
+                .map(row -> {
+                    Number val = (Number) row[1];
+                    return Map.entry((UUID) row[0], val != null ? val.doubleValue() : 0.0);
+                })
                 .sorted((e1, e2) -> Double.compare(e2.getValue(), e1.getValue()))
                 .collect(Collectors.toList());
 

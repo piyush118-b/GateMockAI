@@ -48,41 +48,76 @@ export default function NtaInstructions() {
                     <table className="mt-2 border-collapse border border-gray-400 w-full max-w-lg text-[13px]">
                       <tbody>
                         <tr>
-                          <td className="border border-gray-400 p-2 text-center w-12">
-                            <div className="w-8 h-8 bg-white border border-gray-400 text-black flex items-center justify-center font-bold">1</div>
+                          <td className="border border-gray-400 p-2 text-center w-12 bg-white">
+                            <div className="w-7 h-7 border border-[#b6b6b6] bg-gradient-to-b from-[#ffffff] to-[#e6e6e6] text-[#000] font-sans font-bold text-xs flex items-center justify-center rounded-[3px] shadow-sm mx-auto select-none">1</div>
                           </td>
-                          <td className="border border-gray-400 p-2">You have NOT visited the question yet.</td>
+                          <td className="border border-gray-400 p-2 text-gray-700">You have NOT visited the question yet.</td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 p-2 text-center">
-                            <div className="w-8 h-8 bg-[#e55a2b] text-white rounded-[50%_0_50%_50%] transform rotate-45 flex items-center justify-center font-bold mx-auto">
-                              <span className="-rotate-45">2</span>
-                            </div>
+                          <td className="border border-gray-400 p-2 text-center bg-white">
+                            <svg width="28" height="28" viewBox="0 0 36 36" className="mx-auto drop-shadow-sm select-none">
+                              <defs>
+                                <linearGradient id="orangeGradInst" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="#f05a28" />
+                                  <stop offset="100%" stopColor="#d93c0b" />
+                                </linearGradient>
+                              </defs>
+                              <path d="M 2,2 L 34,2 L 34,22 L 18,34 L 2,22 Z" fill="url(#orangeGradInst)" stroke="#b22c00" strokeWidth="1.5" strokeLinejoin="round" />
+                              <text x="50%" y="54%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="13" fontWeight="bold">2</text>
+                            </svg>
                           </td>
-                          <td className="border border-gray-400 p-2">You have NOT answered the question.</td>
+                          <td className="border border-gray-400 p-2 text-gray-700">You have NOT answered the question.</td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 p-2 text-center">
-                            <div className="w-8 h-8 bg-[#2e7d32] text-white rounded-[50%_50%_0_50%] transform rotate-45 flex items-center justify-center font-bold mx-auto">
-                              <span className="-rotate-45">3</span>
-                            </div>
+                          <td className="border border-gray-400 p-2 text-center bg-white">
+                            <svg width="28" height="28" viewBox="0 0 36 36" className="mx-auto drop-shadow-sm select-none">
+                              <defs>
+                                <linearGradient id="greenGradInst" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="#4caf50" />
+                                  <stop offset="100%" stopColor="#2e7d32" />
+                                </linearGradient>
+                              </defs>
+                              <path d="M 18,2 L 34,14 L 34,34 L 2,34 L 2,14 Z" fill="url(#greenGradInst)" stroke="#1b5e20" strokeWidth="1.5" strokeLinejoin="round" />
+                              <text x="50%" y="60%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="13" fontWeight="bold">3</text>
+                            </svg>
                           </td>
-                          <td className="border border-gray-400 p-2">You have answered the question. <strong>This will be evaluated.</strong></td>
+                          <td className="border border-gray-400 p-2 text-gray-700">You have answered the question. <strong>This will be evaluated.</strong></td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 p-2 text-center">
-                            <div className="w-8 h-8 bg-[#6a1b9a] text-white rounded-full flex items-center justify-center font-bold mx-auto">4</div>
+                          <td className="border border-gray-400 p-2 text-center bg-white">
+                            <svg width="28" height="28" viewBox="0 0 36 36" className="mx-auto drop-shadow-sm select-none">
+                              <defs>
+                                <linearGradient id="purpleGradInst" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="#8e44ad" />
+                                  <stop offset="100%" stopColor="#682a8a" />
+                                </linearGradient>
+                              </defs>
+                              <circle cx="18" cy="18" r="16" fill="url(#purpleGradInst)" stroke="#4a1565" strokeWidth="1.5" />
+                              <text x="50%" y="53%" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="13" fontWeight="bold">4</text>
+                            </svg>
                           </td>
-                          <td className="border border-gray-400 p-2">You have NOT answered the question but marked it for review.</td>
+                          <td className="border border-gray-400 p-2 text-gray-700">You have NOT answered the question but marked it for review.</td>
                         </tr>
                         <tr>
-                          <td className="border border-gray-400 p-2 text-center relative">
-                            <div className="w-8 h-8 bg-[#6a1b9a] text-white rounded-full flex items-center justify-center font-bold mx-auto relative">
-                              5
-                              <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-[#2e7d32] rounded-full border border-white"></div>
-                            </div>
+                          <td className="border border-gray-400 p-2 text-center relative bg-white">
+                            <svg width="28" height="28" viewBox="0 0 36 36" className="mx-auto drop-shadow-sm select-none">
+                              <defs>
+                                <linearGradient id="purpleGradInst2" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="#8e44ad" />
+                                  <stop offset="100%" stopColor="#682a8a" />
+                                </linearGradient>
+                                <linearGradient id="badgeGradInst" x1="0%" y1="0%" x2="0%" y2="100%">
+                                  <stop offset="0%" stopColor="#4caf50" />
+                                  <stop offset="100%" stopColor="#2e7d32" />
+                                </linearGradient>
+                              </defs>
+                              <circle cx="18" cy="18" r="16" fill="url(#purpleGradInst2)" stroke="#4a1565" strokeWidth="1.5" />
+                              <text x="18" y="19" dominantBaseline="middle" textAnchor="middle" fill="white" fontSize="13" fontWeight="bold">5</text>
+                              <circle cx="28" cy="28" r="6.5" fill="url(#badgeGradInst)" stroke="#fff" strokeWidth="1" />
+                              <path d="M 25.5,28 L 27,29.5 L 30.5,26" stroke="white" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                            </svg>
                           </td>
-                          <td className="border border-gray-400 p-2">You have answered the question and marked it for review.</td>
+                          <td className="border border-gray-400 p-2 text-gray-700">You have answered the question and marked it for review (will also be evaluated).</td>
                         </tr>
                       </tbody>
                     </table>
@@ -140,53 +175,64 @@ export default function NtaInstructions() {
         </div>
 
         {/* Right Sidebar - Candidate Info */}
-        <div className="w-[200px] border-l border-gray-300 bg-white flex flex-col items-center pt-6">
-          <div className="w-24 h-28 border border-gray-300 bg-gray-50 flex items-center justify-center shadow-sm">
-            <img src="https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png" alt="Candidate" className="w-full h-full object-cover" />
+        <div className="w-[200px] border-l border-gray-300 bg-white flex flex-col items-center pt-10 px-4 shrink-0">
+          <div className="w-[100px] h-[120px] border border-gray-300 bg-white flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+            <svg viewBox="0 0 100 120" className="w-full h-full bg-gray-200">
+              <rect width="100" height="120" fill="#f0f4f8" />
+              <circle cx="50" cy="42" r="22" fill="#5b86b6" />
+              <path d="M 50,68 C 28,68 16,84 16,102 L 84,102 C 84,84 72,68 50,68 Z" fill="#3a5e8c" />
+              <path d="M 50,68 L 44,78 L 50,92 L 56,78 Z" fill="#e0ecf8" />
+            </svg>
           </div>
-          <div className="mt-4 font-semibold text-[15px] text-[#000080] text-center px-2">
+          <div className="mt-4 font-bold text-[14px] text-[#0f2c59] text-center w-full truncate px-2 select-text">
             {candidateName}
           </div>
         </div>
       </div>
 
       {/* Navigation Footer */}
-      <div className="h-14 bg-white border-t border-gray-300 flex items-center justify-between px-6 z-10">
-        <div>
+      <div className="h-14 bg-[#f5f5f5] border-t border-gray-300 flex items-center justify-between px-6 z-10 shrink-0 select-none">
+        <div className="w-1/4">
           {page === 2 && (
             <button 
               onClick={() => setPage(1)}
-              className="px-6 py-1.5 border border-gray-400 bg-white hover:bg-gray-50 text-[13px] rounded flex items-center gap-1 shadow-sm font-semibold"
+              className="px-6 py-1.5 border border-gray-400 bg-white hover:bg-gray-50 text-[13px] rounded-sm flex items-center gap-1 shadow-sm font-semibold cursor-pointer outline-none transition-colors"
             >
               &lt; Previous
             </button>
           )}
         </div>
         
-        {page === 1 ? (
-          <button 
-            onClick={() => setPage(2)}
-            className="px-6 py-1.5 border border-gray-400 bg-white hover:bg-gray-50 text-[13px] rounded flex items-center gap-1 shadow-sm font-semibold"
-          >
-            Next &gt;
-          </button>
-        ) : (
-          <button 
-            onClick={handleBegin}
-            disabled={!agreed}
-            className={`px-8 py-2 border rounded font-semibold text-[14px] shadow-sm transition-colors ${
-              agreed 
-                ? 'bg-[#5bc0de] hover:bg-[#46b8da] text-white border-[#46b8da] cursor-pointer' 
-                : 'bg-[#999999] text-white border-[#777777] cursor-not-allowed'
-            }`}
-          >
-            I am ready to begin
-          </button>
-        )}
+        <div className="flex-1 flex justify-center">
+          {page === 2 && (
+            <button 
+              onClick={handleBegin}
+              disabled={!agreed}
+              className={`px-8 py-2 border rounded-sm font-semibold text-[14px] shadow-sm transition-all duration-100 ${
+                agreed 
+                  ? 'bg-[#5bc0de] hover:bg-[#31b0d5] text-white border-[#46b8da] cursor-pointer' 
+                  : 'bg-[#999999] text-white border-[#777777] cursor-not-allowed'
+              }`}
+            >
+              I am ready to begin
+            </button>
+          )}
+        </div>
+
+        <div className="w-1/4 flex justify-end">
+          {page === 1 && (
+            <button 
+              onClick={() => setPage(2)}
+              className="px-6 py-1.5 border border-gray-400 bg-white hover:bg-gray-50 text-[13px] rounded-sm flex items-center gap-1 shadow-sm font-semibold cursor-pointer outline-none transition-colors"
+            >
+              Next &gt;
+            </button>
+          )}
+        </div>
       </div>
       
       {/* Footer Version */}
-      <div className="h-5 bg-[#5e7d9b] text-white text-[11px] flex items-center justify-center border-t border-gray-400 font-bold">
+      <div className="h-[22px] bg-[#5e7d9b] text-white text-[11px] flex items-center justify-center border-t border-gray-400 font-bold select-none shrink-0">
         Version : 17.07.00
       </div>
     </div>

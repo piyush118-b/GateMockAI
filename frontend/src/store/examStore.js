@@ -170,8 +170,7 @@ export const useExamStore = create((set, get) => ({
     }
 
     // Auto-adjust active section based on question index (General Aptitude is Q1-Q10, index 0-9)
-    const isFullExam = questions.length > 20;
-    const targetSection = (isFullExam && index >= 10) ? 1 : 0;
+    const targetSection = (index >= 10) ? 1 : 0;
 
     set({
       activeQuestionIndex: index,
