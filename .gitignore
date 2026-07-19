@@ -7,3 +7,6 @@ target/
 data/vector-store.json
 ollama_data/
 .env
+spring-boot.log
+__pycache__/
+**/__pycache__/

@@ -65,6 +65,7 @@ public class SecurityConfig {
                 .clearAuthentication(true)
                 .permitAll()
             )
+            .httpBasic(org.springframework.security.config.Customizer.withDefaults())
             .userDetailsService(customUserDetailsService);
         return http.build();
     }

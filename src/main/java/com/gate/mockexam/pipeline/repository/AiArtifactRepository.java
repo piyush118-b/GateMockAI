@@ -19,4 +19,8 @@ public interface AiArtifactRepository extends JpaRepository<AiArtifact, String> 
     long countByQuestionPaperPaperIdAndStatus(String paperId, String status);
 
     List<AiArtifact> findByQuestionPaperPaperIdAndStatus(String paperId, String status);
+
+    boolean existsByQuestionQuestionIdAndArtifactTypeAndStatus(String questionId, String artifactType, String status);
+
+    boolean existsByQuestionQuestionIdAndArtifactTypeAndVersionAndStatus(String questionId, String artifactType, int version, String status);
 }

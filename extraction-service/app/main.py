@@ -50,6 +50,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
+from fastapi import Request
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"Incoming request: {request.method} {request.url}", flush=True)
+    print(f"Headers: {dict(request.headers)}", flush=True)
+    try:
+        response = await call_next(request)
+        print(f"Response status: {response.status_code}", flush=True)
+        return response
+    except Exception as e:
+        print(f"Middleware caught error: {e}", flush=True)
+        raise
 
 # ─── Health Check ─────────────────────────────────────────────────────────────
 
@@ -121,12 +134,32 @@ async def extract_question_paper(
 
         # Step 3: Extract text
         if pdf_type == "digital":
-            full_text = extract_full_text(pdf_bytes)
-            page_images_map = extract_all_images(pdf_bytes)
+            from .digital_extractor import extract_text_by_page
+            pages = extract_text_by_page(pdf_bytes)
+            filtered_pages = []
+            for page_text in pages:
+                normalized = page_text.lower()
+                if "answer key" in normalized or "answer-key" in normalized or "answerkey" in normalized:
+                    logger.info("[Pipeline 1A] Found Answer Key page. Discarding this and remaining pages.")
+                    break
+                filtered_pages.append(page_text)
+            full_text = "\n\n".join(filtered_pages)
+            
+            # Extract images only for non-answer-key pages
+            num_filtered_pages = len(filtered_pages)
+            raw_images_map = extract_all_images(pdf_bytes)
+            page_images_map = {k: v for k, v in raw_images_map.items() if k <= num_filtered_pages}
         else:
             # Scanned PDF — use OCR
             page_texts = extract_text_with_ocr(pdf_bytes)
-            full_text = "\n\n".join(page_texts)
+            filtered_page_texts = []
+            for page_text in page_texts:
+                normalized = page_text.lower()
+                if "answer key" in normalized or "answer-key" in normalized or "answerkey" in normalized:
+                    logger.info("[Pipeline 1A] Found Answer Key page in OCR. Discarding this and remaining pages.")
+                    break
+                filtered_page_texts.append(page_text)
+            full_text = "\n\n".join(filtered_page_texts)
             page_images_map = {}  # OCR doesn't extract embedded images separately
 
         logger.info(f"[Pipeline 1A] Extracted {len(full_text)} characters of text")

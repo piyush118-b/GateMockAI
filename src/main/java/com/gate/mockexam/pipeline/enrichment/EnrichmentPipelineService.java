@@ -2,6 +2,7 @@ package com.gate.mockexam.pipeline.enrichment;
 
 import com.gate.mockexam.pipeline.domain.GateQuestion;
 import com.gate.mockexam.pipeline.domain.Paper;
+import com.gate.mockexam.pipeline.repository.AiArtifactRepository;
 import com.gate.mockexam.pipeline.repository.GateQuestionRepository;
 import com.gate.mockexam.pipeline.repository.PaperRepository;
 import lombok.RequiredArgsConstructor;
@@ -28,9 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  *
  * DESIGN PRINCIPLE:
  *   - Extraction data (GateQuestion, Paper) is NEVER modified.
- *   - All AI outputs are stored in separate ai_artifacts tables.
- *   - Each worker's output is independently versioned.
- *   - Failed workers do not stop other workers.
+ *   - AI metadata, explanations, hints are stored as separate versioned artifacts.
  */
 @Service
 @RequiredArgsConstructor
@@ -39,6 +38,7 @@ public class EnrichmentPipelineService {
 
     private final PaperRepository paperRepository;
     private final GateQuestionRepository questionRepository;
+    private final AiArtifactRepository artifactRepository;
     private final MetadataGeneratorWorker metadataWorker;
     private final ExplanationGeneratorWorker explanationWorker;
     private final ConceptExtractorWorker conceptWorker;
@@ -110,24 +110,36 @@ public class EnrichmentPipelineService {
 
         // Worker 1: Metadata
         try {
-            metadataWorker.generate(question);
-            log.debug("[Pipeline 2] ✓ Worker1/Metadata for {}", qId);
+            if (artifactRepository.existsByQuestionQuestionIdAndArtifactTypeAndStatus(qId, "METADATA", "VERIFIED")) {
+                log.debug("[Pipeline 2] Skip Worker1/Metadata for {} - already verified", qId);
+            } else {
+                metadataWorker.generate(question);
+                log.debug("[Pipeline 2] ✓ Worker1/Metadata for {}", qId);
+            }
         } catch (Exception e) {
             log.warn("[Pipeline 2] ✗ Worker1/Metadata failed for {}: {}", qId, e.getMessage());
         }
 
         // Worker 2: Explanation
         try {
-            explanationWorker.generate(question);
-            log.debug("[Pipeline 2] ✓ Worker2/Explanation for {}", qId);
+            if (artifactRepository.existsByQuestionQuestionIdAndArtifactTypeAndStatus(qId, "EXPLANATION", "VERIFIED")) {
+                log.debug("[Pipeline 2] Skip Worker2/Explanation for {} - already verified", qId);
+            } else {
+                explanationWorker.generate(question);
+                log.debug("[Pipeline 2] ✓ Worker2/Explanation for {}", qId);
+            }
         } catch (Exception e) {
             log.warn("[Pipeline 2] ✗ Worker2/Explanation failed for {}: {}", qId, e.getMessage());
         }
 
         // Worker 3: Concepts
         try {
-            conceptWorker.generate(question);
-            log.debug("[Pipeline 2] ✓ Worker3/Concepts for {}", qId);
+            if (artifactRepository.existsByQuestionQuestionIdAndArtifactTypeAndStatus(qId, "CONCEPT", "VERIFIED")) {
+                log.debug("[Pipeline 2] Skip Worker3/Concepts for {} - already verified", qId);
+            } else {
+                conceptWorker.generate(question);
+                log.debug("[Pipeline 2] ✓ Worker3/Concepts for {}", qId);
+            }
         } catch (Exception e) {
             log.warn("[Pipeline 2] ✗ Worker3/Concepts failed for {}: {}", qId, e.getMessage());
         }
@@ -136,8 +148,12 @@ public class EnrichmentPipelineService {
         for (int level = 1; level <= 3; level++) {
             final int l = level;
             try {
-                hintWorker.generate(question, l);
-                log.debug("[Pipeline 2] ✓ Worker4/Hint-L{} for {}", l, qId);
+                if (artifactRepository.existsByQuestionQuestionIdAndArtifactTypeAndVersionAndStatus(qId, "HINT", l, "VERIFIED")) {
+                    log.debug("[Pipeline 2] Skip Worker4/Hint-L{} for {} - already verified", l, qId);
+                } else {
+                    hintWorker.generate(question, l);
+                    log.debug("[Pipeline 2] ✓ Worker4/Hint-L{} for {}", l, qId);
+                }
             } catch (Exception e) {
                 log.warn("[Pipeline 2] ✗ Worker4/Hint-L{} failed for {}: {}", l, qId, e.getMessage());
             }

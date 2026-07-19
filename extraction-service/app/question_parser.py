@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Matches: "Q.1", "Q1.", "1.", "Question 1", "(1)"
 QUESTION_START = re.compile(
-    r'(?:^|\n)\s*(?:Q\.?\s*|Question\s+)?(\d+)[.)]\s+',
+    r'(?:^|\n)\s*(?:Q\.?\s*(?:No\.?\s*)?|Question\s+)?(\d+)(?:\s*[.)]|\s*[\n\r])\s*',
     re.MULTILINE | re.IGNORECASE
 )
 
@@ -128,11 +128,21 @@ def split_into_question_blocks(full_text: str) -> List[Tuple[int, str]]:
         logger.warning("No question boundaries detected in text.")
         return []
 
+    # Filter out false positives where the question number is out of range (1 to 65)
+    valid_matches = []
+    for m in matches:
+        try:
+            q_num = int(m.group(1))
+            if 1 <= q_num <= 65:
+                valid_matches.append(m)
+        except ValueError:
+            continue
+
     blocks = []
-    for i, match in enumerate(matches):
+    for i, match in enumerate(valid_matches):
         q_num = int(match.group(1))
         start = match.start()
-        end = matches[i + 1].start() if i + 1 < len(matches) else len(full_text)
+        end = valid_matches[i + 1].start() if i + 1 < len(valid_matches) else len(full_text)
         block_text = full_text[start:end].strip()
         blocks.append((q_num, block_text))
 

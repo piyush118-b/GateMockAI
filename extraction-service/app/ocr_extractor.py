@@ -23,10 +23,7 @@ def get_ocr_engine():
         try:
             from paddleocr import PaddleOCR
             _ocr_engine = PaddleOCR(
-                use_angle_cls=True,
-                lang="en",
-                use_gpu=False,
-                show_log=False,
+                lang="en"
             )
             logger.info("PaddleOCR engine initialized successfully.")
         except ImportError:
@@ -70,18 +67,44 @@ def ocr_image_bytes(img_bytes: bytes) -> str:
         return ""
 
     ocr = get_ocr_engine()
-    result = ocr.ocr(img_array, cls=True)
+    try:
+        result = ocr.ocr(img_array)
+    except Exception as e:
+        logger.warning(f"ocr.ocr failed: {e}. Trying predict().")
+        try:
+            result = ocr.predict(img_array)
+        except Exception as e2:
+            logger.error(f"ocr.predict also failed: {e2}")
+            return ""
 
     if not result or result[0] is None:
         return ""
 
+    res_obj = result[0]
     lines = []
-    for line in result[0]:
-        if line and len(line) >= 2:
-            text = line[1][0]  # OCR text
-            confidence = line[1][1]
-            if confidence > 0.5:
+
+    # Check if the result is in the new PaddleX dictionary-like OCRResult format
+    if hasattr(res_obj, "get") and "rec_texts" in res_obj:
+        texts = res_obj["rec_texts"]
+        scores = res_obj["rec_scores"]
+        for text, score in zip(texts, scores):
+            if score > 0.5:
                 lines.append(text)
+    # Check if the result is in the new PaddleX attribute-based format
+    elif hasattr(res_obj, "rec_texts"):
+        texts = getattr(res_obj, "rec_texts", [])
+        scores = getattr(res_obj, "rec_scores", [])
+        for text, score in zip(texts, scores):
+            if score > 0.5:
+                lines.append(text)
+    # Fallback to the classic PaddleOCR list-of-lists format
+    else:
+        for line in res_obj:
+            if line and len(line) >= 2:
+                text = line[1][0]
+                confidence = line[1][1]
+                if confidence > 0.5:
+                    lines.append(text)
 
     return "\n".join(lines)
 

@@ -83,26 +83,26 @@ services:
   # Python FastAPI PDF Extraction Microservice
   # Handles Pipeline 1: document extraction using PyMuPDF + PaddleOCR
   # API: http://localhost:8090
-  gate-extractor:
-    build:
-      context: ./extraction-service
-      dockerfile: Dockerfile
-    container_name: gate_extractor
-    ports:
-      - "8090:8090"
-    environment:
-      - MINIO_ENDPOINT=http://minio:9000
-      - MINIO_ACCESS_KEY=minioadmin
-      - MINIO_SECRET_KEY=minioadmin
-      - MINIO_BUCKET=gate-assets
-    depends_on:
-      - minio
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+  # gate-extractor:
+  #   build:
+  #     context: ./extraction-service
+  #     dockerfile: Dockerfile
+  #   container_name: gate_extractor
+  #   ports:
+  #     - "8090:8090"
+  #   environment:
+  #     - MINIO_ENDPOINT=http://minio:9000
+  #     - MINIO_ACCESS_KEY=minioadmin
+  #     - MINIO_SECRET_KEY=minioadmin
+  #     - MINIO_BUCKET=gate-assets
+  #   depends_on:
+  #     - minio
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8090/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 5
 
 volumes:
   gate_pgdata:

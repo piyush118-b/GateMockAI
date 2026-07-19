@@ -56,58 +56,72 @@ def normalize_answer(raw: str) -> str:
 
 def parse_answer_key(text: str) -> Dict[str, str]:
     """
-    Parses answer key text into a dictionary of {question_number_str → answer}.
-
+    Parses answer key text into a dictionary of {section_question_number → answer}.
     Returns:
-        Dict e.g. {"1": "A", "2": "D", "17": "15.2 to 15.4", "22": "A,C"}
+        Dict e.g. {"GA_1": "D", "CS_1": "A", "CS_17": "0.125 to 0.125"}
     """
     answer_map: Dict[str, str] = {}
-    lines = text.split('\n')
-    current_section = "GA"
+    lines = [l.strip() for l in text.split('\n') if l.strip()]
 
-    for line in lines:
-        trimmed = line.strip()
-        if not trimmed:
-            continue
+    # 1. Try vertical layout parsing first (regular sequence in columns)
+    for i in range(len(lines)):
+        val = lines[i].upper()
+        if val in ['MCQ', 'NAT', 'MSQ']:
+            if i - 2 >= 0 and i + 1 < len(lines):
+                q_num_str = lines[i-2]
+                section = lines[i+1].upper()
+                if q_num_str.isdigit() and section in ['GA', 'CS']:
+                    q_num = int(q_num_str)
+                    answer_parts = []
+                    found_marks = False
+                    for j in range(i+2, min(i+10, len(lines))):
+                        if lines[j] in ['1', '2', '1.0', '2.0']:
+                            found_marks = True
+                            break
+                        answer_parts.append(lines[j])
+                    if found_marks:
+                        answer = ' '.join(answer_parts).strip()
+                        answer_map[f"{section}_{q_num}"] = normalize_answer(answer)
 
-        # Detect section change
-        if GA_HEADER.search(trimmed):
-            current_section = "GA"
-            logger.debug("Switched to GA section")
-            continue
-        if CS_HEADER.search(trimmed):
-            current_section = "CS"
-            logger.debug("Switched to CS section")
-            continue
+    # 2. If we got nothing, fallback to horizontal line-by-line regexes
+    if len(answer_map) < 5:
+        answer_map = {}
+        current_section = "GA"
+        for line in lines:
+            trimmed = line.strip()
+            if not trimmed:
+                continue
+            if GA_HEADER.search(trimmed):
+                current_section = "GA"
+                continue
+            if CS_HEADER.search(trimmed):
+                current_section = "CS"
+                continue
 
-        # Try table row format
-        m = TABLE_ROW.match(trimmed)
-        if m:
-            q_num = m.group(1)
-            section = m.group(3).upper()
-            answer = normalize_answer(m.group(4))
-            answer_map[q_num] = answer
-            logger.debug(f"Table row: Q{q_num} ({section}) → {answer}")
-            continue
+            m = TABLE_ROW.match(trimmed)
+            if m:
+                q_num = m.group(1)
+                section = m.group(3).upper()
+                answer = normalize_answer(m.group(4))
+                answer_map[f"{section}_{q_num}"] = answer
+                continue
 
-        # Try prefixed format
-        m = PREFIXED.match(trimmed)
-        if m:
-            section = m.group(1).upper()
-            q_num = m.group(2)
-            answer = normalize_answer(m.group(3))
-            answer_map[q_num] = answer
-            logger.debug(f"Prefixed: Q{q_num} ({section}) → {answer}")
-            continue
+            m = PREFIXED.match(trimmed)
+            if m:
+                section = m.group(1).upper()
+                q_num = m.group(2)
+                answer = normalize_answer(m.group(3))
+                answer_map[f"{section}_{q_num}"] = answer
+                continue
 
-        # Try simple format
-        m = SIMPLE.match(trimmed)
-        if m:
-            q_num = m.group(1)
-            answer = normalize_answer(m.group(2))
-            answer_map[q_num] = answer
-            logger.debug(f"Simple: Q{q_num} → {answer}")
-            continue
+            m = SIMPLE.match(trimmed)
+            if m:
+                q_num = m.group(1)
+                # Avoid false positives on decimal ranges
+                if not ("to" in m.group(2).lower() and "." in q_num):
+                    answer = normalize_answer(m.group(2))
+                    answer_map[f"{current_section}_{q_num}"] = answer
+                    continue
 
     logger.info(f"Parsed {len(answer_map)} answers from answer key text.")
     return answer_map

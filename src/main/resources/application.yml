@@ -27,7 +27,7 @@ spring:
         table-name: gate_vector_store
         initialize-schema: true
   datasource:
-    url: jdbc:postgresql://localhost:5432/gate_db
+    url: jdbc:postgresql://localhost:5439/gate_db
     username: gate_user
     password: gate_pass
     driver-class-name: org.postgresql.Driver
@@ -58,11 +58,13 @@ logging:
   level:
     root: INFO
     com.gate: DEBUG
+    org.springframework.web.client: DEBUG
+    org.springframework.http.converter: DEBUG
 
 # ─── Gemini AI (used ONLY for AI Enrichment Pipeline workers) ──────────────
 gemini:
   api:
-    key: ${GEMINI_API_KEY}
+    key: ${GEMINI_API_KEY:placeholder}
   quota:
     daily-token-limit: 500000
     warn-threshold: 400000

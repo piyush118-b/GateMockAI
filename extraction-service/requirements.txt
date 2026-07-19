@@ -1,29 +1,28 @@
 # Core FastAPI framework
-fastapi==0.115.0
-uvicorn[standard]==0.30.6
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.6
 
 # PDF processing
-PyMuPDF==1.24.9          # Digital PDF extraction (fitz)
+pymupdf>=1.24.10          # Digital PDF extraction (fitz)
 
 # OCR for scanned PDFs
-paddlepaddle==2.6.1      # PaddlePaddle CPU backend
-paddleocr==2.8.1         # PaddleOCR with layout analysis
+paddlepaddle>=2.6.2      # PaddlePaddle CPU backend (supports arm64/Apple Silicon)
+paddleocr>=2.8.1         # PaddleOCR with layout analysis
 
 # Image processing
-Pillow==10.4.0
-opencv-python-headless==4.10.0.84
-numpy==1.26.4
+Pillow>=10.4.0
+opencv-python-headless>=4.10.0.84
+numpy>=1.26.4
 
 # MinIO object storage client
-minio==7.2.8
+minio>=7.2.8
 
 # HTTP client (for health checks)
-httpx==0.27.0
+httpx>=0.27.0
 
 # Data validation
-pydantic==2.8.2
+pydantic>=2.8.2
 
 # Utilities
-python-multipart==0.0.9  # For FastAPI file upload support
-python-dotenv==1.0.1
-hashlib2==1.0.0          # For checksum computation (stdlib hashlib is fine too)
+python-multipart>=0.0.9  # For FastAPI file upload support
+python-dotenv>=1.0.1

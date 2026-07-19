@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.http.client.MultipartBodyBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -48,7 +49,11 @@ public class ExtractionPipelineService {
     private String extractionServiceUrl;
 
     private RestClient restClient() {
+        java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
+                .build();
         return RestClient.builder()
+                .requestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory(httpClient))
                 .baseUrl(extractionServiceUrl)
                 .build();
     }
@@ -119,8 +124,9 @@ public class ExtractionPipelineService {
 
         for (ExtractedQuestionDto qDto : extractedPaper.getQuestions()) {
             try {
-                // Attach correct answer from merged answer map
-                String correctAnswer = answerMap.get(String.valueOf(qDto.getQuestionNumber()));
+                // Attach correct answer from merged answer map using section prefix
+                String key = qDto.getSection() + "_" + qDto.getQuestionNumber();
+                String correctAnswer = answerMap.get(key);
 
                 // Validate
                 List<String> violations = questionValidator.validate(qDto, correctAnswer);
@@ -195,16 +201,15 @@ public class ExtractionPipelineService {
 
     private ExtractedPaperDto callExtractQuestionPaper(String paperId, byte[] pdfBytes) {
         try {
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", new ByteArrayResource(pdfBytes) {
+            MultipartBodyBuilder builder = new MultipartBodyBuilder();
+            builder.part("file", new ByteArrayResource(pdfBytes) {
                 @Override public String getFilename() { return "question_paper.pdf"; }
-            });
-            body.add("paper_id", paperId);
+            }, MediaType.APPLICATION_PDF);
+            builder.part("paper_id", paperId);
 
             ResponseEntity<String> response = restClient().post()
                     .uri("/extract/question-paper")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(body)
+                    .body(builder.build())
                     .retrieve()
                     .toEntity(String.class);
 
@@ -224,16 +229,15 @@ public class ExtractionPipelineService {
 
     private ExtractedAnswerKeyDto callExtractAnswerKey(String paperId, byte[] answerKeyBytes) {
         try {
-            MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-            body.add("file", new ByteArrayResource(answerKeyBytes) {
+            MultipartBodyBuilder builder = new MultipartBodyBuilder();
+            builder.part("file", new ByteArrayResource(answerKeyBytes) {
                 @Override public String getFilename() { return "answer_key.pdf"; }
-            });
-            body.add("paper_id", paperId);
+            }, MediaType.APPLICATION_PDF);
+            builder.part("paper_id", paperId);
 
             ResponseEntity<String> response = restClient().post()
                     .uri("/extract/answer-key")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(body)
+                    .body(builder.build())
                     .retrieve()
                     .toEntity(String.class);
 

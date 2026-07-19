@@ -12,7 +12,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Minimum characters per page to classify as digital
-MIN_CHARS_PER_PAGE = 50
+MIN_CHARS_PER_PAGE = 300
 SAMPLE_PAGES = 5  # Only check first N pages for performance
 
 
