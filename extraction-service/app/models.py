@@ -1,69 +1,39 @@
 """
-Pydantic models for the GATE Extraction Microservice.
+v2.1 Data Models — DiagramCropService only.
 
-These models define the contract between the Python extraction service
-and the Java Spring Boot application.
+The old ExtractedPaper, ExtractedQuestion, ExtractedAnswerKey models are removed.
+Gemini (via Spring Boot) now reads the PDF directly and extracts all question data.
+This Python service only handles lightweight diagram image cropping.
 """
 
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import Optional
 
 
-class ExtractedAsset(BaseModel):
-    """Reference to an asset uploaded to MinIO."""
-    asset_type: str = "Image"           # Image, Graph, Table, Circuit, Tree, Automata, Flowchart
-    object_key: str                      # MinIO object key
-    mime_type: str = "image/png"
-    width: Optional[int] = None
-    height: Optional[int] = None
-    checksum: Optional[str] = None      # SHA-256 hex digest
+class BoundingBox(BaseModel):
+    """Normalized bounding box coordinates on a 0-1000 grid."""
+    y_min: float = Field(ge=0, le=1000, description="Top edge (0-1000)")
+    x_min: float = Field(ge=0, le=1000, description="Left edge (0-1000)")
+    y_max: float = Field(ge=0, le=1000, description="Bottom edge (0-1000)")
+    x_max: float = Field(ge=0, le=1000, description="Right edge (0-1000)")
 
 
-class ExtractedOption(BaseModel):
-    """A single answer option for MCQ/MSQ."""
-    label: str                           # A, B, C, D
-    option_text: str
-    assets: List[ExtractedAsset] = []   # Option-level images
+class DiagramCropRequest(BaseModel):
+    """Request to crop a diagram from a page image."""
+    image_base64: str = Field(description="Base64-encoded PNG of the page")
+    bounding_box: BoundingBox = Field(description="Normalized bounding box from Gemini")
+    padding_px: int = Field(default=8, ge=0, le=50, description="Extra padding around the crop")
 
 
-class ExtractedQuestion(BaseModel):
-    """One fully parsed GATE question."""
-    question_number: int
-    section: str = "GA"                 # GA or CS (or Section A/B for other exams)
-    question_type: str = "MCQ"          # MCQ, MSQ, NAT
-    question_text: str
-    marks: Optional[float] = None
-    negative_marks: Optional[float] = None
-    options: List[ExtractedOption] = []
-    assets: List[ExtractedAsset] = []   # Question-level images/graphs
-    valid: bool = True
-    validation_message: Optional[str] = None
+class DiagramCropResponse(BaseModel):
+    """Response from the crop service."""
+    webp_base64: str = Field(description="Base64-encoded WebP of the cropped diagram")
+    width_px: int
+    height_px: int
+    success: bool = True
+    message: str = "OK"
 
 
-class ExtractedPaper(BaseModel):
-    """Result of Sub-Pipeline A: question paper extraction."""
-    exam_name: str
-    year: Optional[int] = None
-    branch: Optional[str] = None
-    session: Optional[str] = None
-    duration: Optional[int] = None
-    total_marks: Optional[float] = None
-    total_questions: Optional[int] = None
-    pdf_type: str = "digital"           # "digital" or "scanned"
-    questions: List[ExtractedQuestion] = []
-
-
-class ExtractedAnswerKey(BaseModel):
-    """Result of Sub-Pipeline B: answer key extraction."""
-    answers: Dict[str, str] = {}        # {question_number_str → answer_string}
-    pdf_type: str = "digital"
-    total_parsed: int = 0
-    parser_warnings: Optional[str] = None
-
-
-class ExtractionRequest(BaseModel):
-    """Parameters for a paper extraction request."""
-    paper_id: str
-    exam_name: Optional[str] = "GATE"
-    year: Optional[int] = None
-    branch: Optional[str] = "CSE"
+class ErrorResponse(BaseModel):
+    success: bool = False
+    message: str

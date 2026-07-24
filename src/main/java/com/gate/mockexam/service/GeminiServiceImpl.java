@@ -30,8 +30,8 @@ public class GeminiServiceImpl implements GeminiService {
 
     public GeminiServiceImpl(
             @Value("${gemini.api.key}") String apiKey,
-            @Value("${gemini.model.transcription:gemini-2.5-flash}") String transcriptionModel,
-            @Value("${gemini.model.generation:gemini-2.5-flash}") String generationModel,
+            @Value("${gemini.model.transcription:gemini-3.5-flash}") String transcriptionModel,
+            @Value("${gemini.model.generation:gemini-3.5-flash}") String generationModel,
             ObjectMapper objectMapper,
             GeminiUsageService geminiUsageService) {
         this.apiKey = apiKey.trim();

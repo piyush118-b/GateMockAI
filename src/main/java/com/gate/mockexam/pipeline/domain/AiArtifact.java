@@ -40,7 +40,7 @@ public class AiArtifact {
     @Builder.Default
     private Integer version = 1;
 
-    /** Model used for generation, e.g., "gemini-2.5-flash" */
+    /** Model used for generation, e.g., "gemini-3.5-flash" */
     @Column(nullable = false, length = 100)
     private String model;
 

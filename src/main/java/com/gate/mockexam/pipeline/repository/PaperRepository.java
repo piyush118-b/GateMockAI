@@ -16,4 +16,6 @@ public interface PaperRepository extends JpaRepository<Paper, String> {
     List<Paper> findByStatus(String status);
 
     boolean existsByExamNameAndYearAndBranch(String examName, int year, String branch);
+
+    List<Paper> findByStatusAndUploadedAtBefore(String status, java.time.LocalDateTime cutoff);
 }

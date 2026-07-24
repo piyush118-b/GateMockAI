@@ -3,7 +3,7 @@ package com.gate.mockexam.pipeline.controller;
 import com.gate.mockexam.pipeline.domain.GateQuestion;
 import com.gate.mockexam.pipeline.domain.Paper;
 import com.gate.mockexam.pipeline.enrichment.EnrichmentPipelineService;
-import com.gate.mockexam.pipeline.extraction.ExtractionPipelineService;
+import com.gate.mockexam.pipeline.ingestion.MultimodalIngestionService;
 import com.gate.mockexam.pipeline.repository.AiArtifactRepository;
 import com.gate.mockexam.pipeline.repository.GateQuestionRepository;
 import com.gate.mockexam.pipeline.repository.PaperRepository;
@@ -38,21 +38,20 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PaperIngestionController {
 
-    private final ExtractionPipelineService extractionPipeline;
     private final EnrichmentPipelineService enrichmentPipeline;
+    private final MultimodalIngestionService multimodalIngestionService;
     private final PaperRepository paperRepository;
     private final GateQuestionRepository questionRepository;
     private final AiArtifactRepository artifactRepository;
 
     // ─────────────────────────────────────────────────────────────────────────
     // POST /api/pipeline/ingest
-    // Trigger Pipeline 1: upload question paper + optional answer key PDFs
+    // Trigger Pipeline 1: upload single question paper PDF
     // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping(value = "/ingest", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> ingestPaper(
             @RequestParam("questionPaper") MultipartFile questionPaper,
-            @RequestParam(value = "answerKey", required = false) MultipartFile answerKey,
             @RequestParam("paperId")   String paperId,
             @RequestParam("examName")  String examName,
             @RequestParam("year")      int year,
@@ -71,17 +70,16 @@ public class PaperIngestionController {
             log.info("[API] Starting Pipeline 1 for paperId={} by user={}", paperId, principal.getName());
 
             byte[] questionBytes = questionPaper.getBytes();
-            byte[] answerBytes   = (answerKey != null && !answerKey.isEmpty()) ? answerKey.getBytes() : null;
 
-            Paper paper = extractionPipeline.runPipeline(paperId, examName, year, branch, questionBytes, answerBytes);
+            Paper paper = multimodalIngestionService.ingest(paperId, examName, year, branch, questionBytes);
+            enrichmentPipeline.enrichPaperAsync(paperId);
 
             return ResponseEntity.ok(Map.of(
                     "status",        "success",
-                    "message",       "Pipeline 1 (Extraction) completed successfully.",
+                    "message",       "Pipeline v2.1: Extraction + Enrichment started. Question text and answers derived by Gemini directly from the PDF.",
                     "paperId",       paper.getPaperId(),
                     "totalQuestions", paper.getTotalQuestions(),
-                    "paperStatus",   paper.getStatus(),
-                    "nextStep",      "POST /api/pipeline/enrich/" + paperId
+                    "paperStatus",   paper.getStatus()
             ));
 
         } catch (Exception e) {

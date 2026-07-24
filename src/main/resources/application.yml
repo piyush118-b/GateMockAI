@@ -27,9 +27,9 @@ spring:
         table-name: gate_vector_store
         initialize-schema: true
   datasource:
-    url: jdbc:postgresql://localhost:5439/gate_db
-    username: gate_user
-    password: gate_pass
+    url: jdbc:postgresql://db.xvhlrxrrbijyeijqiglp.supabase.co:5432/postgres?sslmode=require
+    username: postgres
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -64,16 +64,20 @@ logging:
 # ─── Gemini AI (used ONLY for AI Enrichment Pipeline workers) ──────────────
 gemini:
   api:
-    key: ${GEMINI_API_KEY:placeholder}
+    key: ${GEMINI_API_KEY}
   quota:
     daily-token-limit: 500000
     warn-threshold: 400000
   model:
-    generation: gemini-2.5-flash
+    generation: gemini-3.5-flash
+    solve: gemini-3.5-flash           # v2.1 multimodal solve+enrich model
     max-output-tokens:
       generation: 8192
     temperature:
       generation: 0.3
+  confidence:
+    threshold: 0.70                   # MCQ/MSQ auto-publish threshold
+    nat-threshold: 0.85               # Stricter for NAT (numerical) questions
 
 # ─── MinIO Object Storage ────────────────────────────────────────────────────
 minio:
@@ -87,3 +91,12 @@ extraction:
   service:
     url: http://localhost:8090
     timeout-seconds: 120
+
+# ─── v2.1 Pipeline Config ─────────────────────────────────────────────────────
+pipeline:
+  batch-size: 10                      # Questions per QualityReview Pass-2 batch
+  crop-service-url: ${CROP_SERVICE_URL:}  # Render URL of lightweight Python crop service
+
+# ─── Storage Cleanup Job ──────────────────────────────────────────────────────
+cleanup:
+  interval-ms: 3600000                # Run every hour

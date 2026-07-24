@@ -14,6 +14,8 @@ import ExamConsole from './components/ExamConsole'
 import ScorecardResult from './components/ScorecardResult'
 import AttemptAnalytics from './components/AttemptAnalytics'
 
+import AdminReviewQueue from './components/AdminReviewQueue';
+
 // Admin Portal
 import AdminDashboard from './components/AdminDashboard'
 import AdminRag from './components/AdminRag'
@@ -30,6 +32,7 @@ export default function App() {
         {/* ─── AUTH ─── */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/admin/review-queue" element={<AdminReviewQueue />} />
 
         {/* ─── STUDENT PORTAL ─── */}
         <Route path="/student/dashboard" element={<StudentDashboard />} />

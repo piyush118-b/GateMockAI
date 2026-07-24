@@ -101,6 +101,13 @@
             <artifactId>minio</artifactId>
             <version>8.5.10</version>
         </dependency>
+        <!-- .env file loader — auto-reads .env into Spring Environment on startup -->
+        <dependency>
+            <groupId>me.paulschwarz</groupId>
+            <artifactId>spring-dotenv</artifactId>
+            <version>4.0.0</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -282,5 +282,19 @@ export const useExamStore = create((set, get) => ({
 
   closeFullscreenOverlay: () => {
     set({ isFullscreenOverlayActive: false });
-  }
+  },
+
+  // ── v2.1: Admin Review Queue ───────────────────────────────────────────────
+  reviewQueueCount: 0,
+
+  fetchReviewQueueCount: async () => {
+    try {
+      const res = await fetch('/api/admin/review/queue/count');
+      if (!res.ok) return;
+      const d = await res.json();
+      set({ reviewQueueCount: d.unresolvedCount || 0 });
+    } catch (e) {
+      console.error('[examStore] Failed to fetch review queue count', e);
+    }
+  },
 }));

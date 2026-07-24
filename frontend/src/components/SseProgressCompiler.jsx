@@ -165,7 +165,7 @@ export default function SseProgressCompiler() {
         <div className="border-b border-gray-800 pb-4">
           <h2 className="text-xl font-black uppercase text-gray-100 tracking-tight">AI EXAM GENERATION PANEL</h2>
           <p className="text-xs text-gray-400 font-medium mt-1 leading-relaxed">
-            Gemini 2.5 Flash generates questions from your PGVector knowledge base. Semantic retrieval + few-shot prompting ensures GATE-quality output.
+            Gemini 3.5 Flash generates questions from your PGVector knowledge base. Semantic retrieval + few-shot prompting ensures GATE-quality output.
           </p>
         </div>
 

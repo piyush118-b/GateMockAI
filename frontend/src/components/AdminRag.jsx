@@ -284,7 +284,7 @@ function ReviewPanel({ draft, onConfirm, onCancel }) {
           </button>
           
           <div style={{ marginTop: '0.5rem', textAlign: 'center', fontSize: '0.78rem', color: '#64748b', fontWeight: 500 }} className="font-sans">
-            Embedding {draft.questions.length} questions via nomic-embed-text (local, free)
+            Powered by Gemini AI — direct PDF multimodal extraction
           </div>
         </div>
       </div>
@@ -294,9 +294,9 @@ function ReviewPanel({ draft, onConfirm, onCancel }) {
 
 // ─── Main AdminRag Component ─────────────────────────────────────────────────
 const statusMessages = [
-  "Sending PDF to Gemini 2.5 Flash...",
-  "Extracting all questions and options...",
-  "Binding answer keys and validating..."
+  "Sending PDF to Gemini AI...",
+  "Extracting all questions, options and solving answers...",
+  "Enriching questions with metadata and saving to database..."
 ];
 
 export default function AdminRag() {
@@ -356,12 +356,34 @@ export default function AdminRag() {
     if (e && e.preventDefault) e.preventDefault()
     const form = formRef.current || (e && e.target)
     if (!form) return
-    const fd = new FormData(form)
+    
+    const rawFd = new FormData(form)
+    const file = rawFd.get("file")
+    const branchRaw = rawFd.get("subject") || "CSE"
+    const topicRaw = rawFd.get("topic") || ""
+
+    // Extract year digits from topic/year input
+    const yearMatch = topicRaw.match(/\d{4}/)
+    const year = yearMatch ? parseInt(yearMatch[0], 10) : new Date().getFullYear()
+
+    // Normalize values
+    const branch = branchRaw.trim().toUpperCase()
+    const examName = topicRaw.includes(branch) ? topicRaw.trim() : `GATE ${branch} ${year}`
+    const paperId = `gate_${branch.toLowerCase()}_${year}`
+
+    // Construct the backend payload expected by PaperIngestionController
+    const fd = new FormData()
+    fd.append("questionPaper", file)
+    fd.append("paperId", paperId)
+    fd.append("examName", examName)
+    fd.append("year", year)
+    fd.append("branch", branch)
+
     setUploading(true)
     setAlert(null)
 
     try {
-      const res = await fetch('/api/admin/rag/upload', { method: 'POST', body: fd })
+      const res = await fetch('/api/pipeline/ingest', { method: 'POST', body: fd })
       let data
       try {
         data = await res.json()
@@ -371,32 +393,32 @@ export default function AdminRag() {
         throw err
       }
       if (!res.ok) {
-        const err = new Error(data.error || data.message || 'Upload failed')
+        const err = new Error(data.error || data.message || 'Ingestion failed')
         err.status = res.status
         throw err
       }
-      setDraft(data)
+      
+      setAlert({ 
+        type: 'success', 
+        msg: `Paper successfully ingested! "${examName}" — ${data.totalQuestions || 0} questions extracted and enriched by Gemini AI. Questions below the confidence threshold have been queued for admin review.`,
+        showReviewLink: true,
+      })
+      refreshStatus()
+      form.reset()
     } catch (err) {
       const status = err.status
       let msg = ""
-      let isRetryable = false
 
-      if (status === 422) {
-        msg = "⚠ Gemini responded but the output could not be parsed. This usually resolves on retry. Click 'Parse Again' to try once more."
-        isRetryable = true
-      } else if (status === 429) {
+      if (status === 429) {
         msg = "Daily token limit reached. Resets at midnight."
       } else if (status === 401 || status === 403) {
-        msg = "Check that your GEMINI_API_KEY is set and valid."
-      } else if (status === 503 || !status || err.message?.includes("Failed to fetch") || err.message?.includes("NetworkError")) {
-        msg = "Gemini API unreachable. Check your internet connection."
+        msg = "Check that you are logged in and authorized."
       } else {
-        msg = `Extraction failed: ${err.message || 'Unknown error occurred.'}`
+        msg = `Ingestion failed: ${err.message || 'Unknown error occurred.'}`
       }
 
       setAlert({ 
         type: 'error', 
-        isTruncation: isRetryable,
         msg: msg
       })
     } finally {
@@ -438,7 +460,7 @@ export default function AdminRag() {
         <div style={{ background: 'linear-gradient(135deg,#0f172a 0%,#1e293b 100%)', padding: '2.5rem', borderRadius: 16, color: '#fff', marginBottom: '2rem', boxShadow: '0 10px 15px rgba(0,0,0,0.1)' }}>
           <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.025em' }}>RAG Document Ingestion & PGVector</h1>
           <p style={{ margin: '0.6rem 0 0', color: '#94a3b8', fontSize: '0.95rem', lineHeight: 1.6 }}>
-            Upload official GATE past exam papers and answer keys. Gemini AI extracts all questions in one fast pass — results are stored in PostgreSQL PGVector for semantic retrieval.
+            Upload official GATE past exam papers. Gemini AI extracts all questions in one fast pass — results are stored in PostgreSQL PGVector for semantic retrieval.
           </p>
         </div>
 
@@ -461,34 +483,21 @@ export default function AdminRag() {
               <span>{alert.type === 'success' ? '✓ ' : '⚠ '}</span>
               <span style={{ lineHeight: 1.5 }}>{alert.msg}</span>
             </div>
-            {alert.type === 'error' && alert.isTruncation && (
-              <button
-                type="button"
-                onClick={() => handleFormSubmit()}
+            {alert.showReviewLink && (
+              <a
+                href="/admin/review-queue"
                 style={{
-                  alignSelf: 'flex-start',
-                  padding: '0.5rem 1rem',
-                  background: '#ef4444',
-                  color: '#fff',
-                  border: 'none',
-                  borderRadius: 6,
-                  fontWeight: 700,
-                  fontSize: '0.8rem',
-                  textTransform: 'uppercase',
-                  cursor: 'pointer',
-                  boxShadow: '0 2px 4px rgba(239,68,68,0.2)',
-                  transition: 'background 0.2s',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.25rem'
+                  display: 'inline-flex', alignItems: 'center', gap: '0.4rem',
+                  background: '#059669', color: '#fff', border: 'none',
+                  borderRadius: 8, padding: '0.5rem 1rem',
+                  fontSize: '0.8rem', fontWeight: 700, textDecoration: 'none',
+                  cursor: 'pointer', alignSelf: 'flex-start',
                 }}
-                onMouseOver={e => e.target.style.background = '#dc2626'}
-                onMouseOut={e => e.target.style.background = '#ef4444'}
               >
-                <span>↻</span>
-                <span>Parse Again</span>
-              </button>
+                <span>→ Review Flagged Questions</span>
+              </a>
             )}
+
           </div>
         )}
 
@@ -497,7 +506,7 @@ export default function AdminRag() {
           {/* Upload form card */}
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, padding: '2rem', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.75rem', marginBottom: '1.5rem' }}>
-              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Ingest Question Paper & Key</h2>
+              <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>Ingest Question Paper</h2>
               <span style={{ background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0', borderRadius: 9999, padding: '0.25rem 0.75rem', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
                 {vectorCount} {vectorCount === '—' ? 'VECTORS' : 'VECTORS'}
               </span>
@@ -516,17 +525,6 @@ export default function AdminRag() {
                   </label>
                   <input
                     type="file" name="file" accept=".pdf,.txt" required disabled={uploading}
-                    style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
-                  />
-                </div>
-
-                {/* Answer Key File */}
-                <div style={{ marginBottom: '1.25rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.5rem' }}>
-                    Official Answer Key PDF File (.pdf, .txt) — Optional
-                  </label>
-                  <input
-                    type="file" name="answerKeyFile" accept=".pdf,.txt" disabled={uploading}
                     style={{ width: '100%', padding: '0.65rem 1rem', boxSizing: 'border-box', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', cursor: 'pointer' }}
                   />
                 </div>
@@ -557,24 +555,9 @@ export default function AdminRag() {
                   </div>
                 </div>
 
-                {/* Answer Key Text */}
-                <div style={{ marginBottom: '1.5rem' }}>
-                  <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', marginBottom: '0.25rem' }}>
-                    Manual Answer Key Entry — Optional but Recommended
-                  </label>
-                  <p style={{ margin: '0 0 0.5rem', fontSize: '0.78rem', color: '#94a3b8' }}>
-                    Format as <code>question_number: value</code> (one per line)
-                  </p>
-                  <textarea
-                    name="answerKeyText"
-                    rows={6}
-                    disabled={uploading}
-                    placeholder={"1: B\n2: A, C\n3: 15.5\n4: D"}
-                    style={{ width: '100%', padding: '0.75rem 1rem', boxSizing: 'border-box', border: '1px solid #cbd5e1', borderRadius: 10, fontSize: '0.88rem', color: '#0f172a', background: '#fff', fontFamily: 'monospace', resize: 'vertical', outline: 'none', lineHeight: 1.6 }}
-                    onFocus={e => e.target.style.borderColor = '#6366f1'}
-                    onBlur={e => e.target.style.borderColor = '#cbd5e1'}
-                  />
-                </div>
+                <p style={{ color: '#64748b', fontSize: '0.8rem', margin: '6px 0 0', fontStyle: 'italic' }}>
+                  ✨ Answer keys are no longer required — Gemini reads and solves the paper directly.
+                </p>
               </div>
 
               {uploading ? (

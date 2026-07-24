@@ -36,7 +36,7 @@ public class GeminiTokenUsage {
 
     @Column(name = "model_used", nullable = false, length = 50)
     @Builder.Default
-    private String modelUsed = "gemini-2.5-flash";
+    private String modelUsed = "gemini-3.5-flash";
 
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default

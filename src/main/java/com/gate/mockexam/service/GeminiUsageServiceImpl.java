@@ -55,7 +55,7 @@ public class GeminiUsageServiceImpl implements GeminiUsageService {
                 .inputTokens(inputTokens)
                 .outputTokens(outputTokens)
                 .totalTokens(total)
-                .modelUsed("gemini-2.5-flash")
+                .modelUsed("gemini-3.5-flash")
                 .build();
         repository.save(usage);
         log.info("Recorded Gemini token usage for callType={}: input={}, output={}, total={}", 

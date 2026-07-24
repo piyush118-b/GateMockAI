@@ -25,4 +25,6 @@ public interface GateQuestionRepository extends JpaRepository<GateQuestion, Stri
 
     @Query("SELECT q FROM GateQuestion q WHERE q.paper.paperId = :paperId AND q.correctAnswer IS NULL")
     List<GateQuestion> findQuestionsWithoutAnswer(@Param("paperId") String paperId);
+
+    List<GateQuestion> findByPaperPaperIdAndReviewStatus(String paperId, String reviewStatus);
 }

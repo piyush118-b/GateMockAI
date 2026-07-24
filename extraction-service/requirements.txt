@@ -1,28 +1,19 @@
-# Core FastAPI framework
+# GateMockAI v2.1 — Page Prep & Diagram Crop Service
+# OCR dependencies (paddlepaddle, paddleocr, pymupdf) REMOVED — Gemini reads PDF directly
+
+# Core framework
 fastapi>=0.115.0
 uvicorn[standard]>=0.30.6
 
-# PDF processing
-pymupdf>=1.24.10          # Digital PDF extraction (fitz)
-
-# OCR for scanned PDFs
-paddlepaddle>=2.6.2      # PaddlePaddle CPU backend (supports arm64/Apple Silicon)
-paddleocr>=2.8.1         # PaddleOCR with layout analysis
-
-# Image processing
+# Image processing (crop only — no OCR)
 Pillow>=10.4.0
-opencv-python-headless>=4.10.0.84
-numpy>=1.26.4
+pdf2image>=1.17.0
 
-# MinIO object storage client
+# Storage
 minio>=7.2.8
 
-# HTTP client (for health checks)
-httpx>=0.27.0
-
-# Data validation
-pydantic>=2.8.2
-
 # Utilities
-python-multipart>=0.0.9  # For FastAPI file upload support
+python-multipart>=0.0.9
+pydantic>=2.8.2
 python-dotenv>=1.0.1
+httpx>=0.27.0

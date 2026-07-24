@@ -23,4 +23,6 @@ public interface AiArtifactRepository extends JpaRepository<AiArtifact, String> 
     boolean existsByQuestionQuestionIdAndArtifactTypeAndStatus(String questionId, String artifactType, String status);
 
     boolean existsByQuestionQuestionIdAndArtifactTypeAndVersionAndStatus(String questionId, String artifactType, int version, String status);
+
+    long countByQuestionQuestionIdAndArtifactType(String questionId, String artifactType);
 }

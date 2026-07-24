@@ -24,6 +24,9 @@ export default function AdminDashboard() {
   const [geminiStatus, setGeminiStatus] = useState(null);
   const [toast, setToast] = useState(null);
 
+  // Review queue pending count
+  const [reviewCount, setReviewCount] = useState(0);
+
   const showToast = (message) => {
     setToast(message);
     setTimeout(() => {
@@ -66,6 +69,11 @@ export default function AdminDashboard() {
       .catch(err => {
         console.warn('Failed to load Gemini API status:', err.message);
       });
+
+    fetch('/api/admin/review/queue/count')
+      .then(res => res.ok ? res.json() : { unresolvedCount: 0 })
+      .then(json => setReviewCount(json.unresolvedCount || 0))
+      .catch(() => {});
 
     fetch('/api/admin/dashboard')
       .then(res => {
@@ -192,10 +200,21 @@ export default function AdminDashboard() {
 
         <div className="flex items-center gap-6">
           <Link 
+            to="/admin/review-queue"
+            className="relative text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+          >
+            Review Queue
+            {reviewCount > 0 && (
+              <span className="absolute -top-2 -right-3 bg-amber-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                {reviewCount}
+              </span>
+            )}
+          </Link>
+          <Link 
             to="/admin/analytics"
             className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
           >
-            Analytics Dashboard
+            Analytics
           </Link>
           <a 
             href="/logout"
@@ -303,7 +322,7 @@ export default function AdminDashboard() {
                 <h3 className="text-sm font-black uppercase tracking-wider">AI RAG Exam Compiler</h3>
               </div>
               <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-                Compile a full-length, high-fidelity **65-question GATE paper** matching official CSE weightage allocations. It dynamically retrieves questions from PGVector seed stores using local Ollama model alignments.
+                Compile a full-length, high-fidelity 65-question GATE paper matching official CSE weightage allocations. Dynamically retrieves questions from PGVector semantic stores and reranks using Gemini AI.
               </p>
             </div>
 
@@ -379,7 +398,7 @@ export default function AdminDashboard() {
             <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
               <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Ingestion Engine</span>
               <p className="text-[11px] text-gray-500 leading-relaxed">
-                Upload official exam papers and matching answer key sheets to chunk, auto-classify, explain, and index new RAG sources.
+                Upload official GATE exam papers. Gemini AI extracts, solves, and enriches all questions in one pass — no answer keys required.
               </p>
               <div className="flex flex-col sm:flex-row items-center gap-2 mt-1">
                 <Link
@@ -396,7 +415,7 @@ export default function AdminDashboard() {
                       : 'bg-red-50 text-red-700 border-red-200'
                   }`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${geminiStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
-                    {geminiStatus.connected ? 'Gemini 2.5 Flash Connected' : 'API Key Not Set'}
+                    {geminiStatus.connected ? 'Gemini 3.5 Flash Connected' : 'API Key Not Set'}
                   </span>
                 )}
               </div>

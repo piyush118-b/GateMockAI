@@ -54,6 +54,31 @@ public class GateQuestion {
     @Column(name = "correct_answer", columnDefinition = "TEXT")
     private String correctAnswer;
 
+    /**
+     * v2.1: Source of the correct answer.
+     * HUMAN_VERIFIED = derived from real answer key PDF (legacy data).
+     * LLM_DERIVED    = solved by Gemini multimodal directly from the paper.
+     */
+    @Column(name = "answer_source", length = 50, nullable = false)
+    @Builder.Default
+    private String answerSource = "HUMAN_VERIFIED";
+
+    /**
+     * v2.1: Gemini's self-reported confidence for LLM_DERIVED answers (0.00–1.00).
+     * Null for HUMAN_VERIFIED answers.
+     */
+    @Column(name = "confidence_score", precision = 3, scale = 2)
+    private java.math.BigDecimal confidenceScore;
+
+    /**
+     * v2.1: Student-visibility lifecycle status.
+     * PUBLISHED    = visible to students in exams and practice.
+     * NEEDS_REVIEW = hidden from students; queued for admin review.
+     */
+    @Column(name = "review_status", length = 50, nullable = false)
+    @Builder.Default
+    private String reviewStatus = "PUBLISHED";
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
