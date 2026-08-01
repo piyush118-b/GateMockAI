@@ -78,3 +78,42 @@ body {
 .palette-shape-marked {
   border-radius: 9999px;
 }
+
+/* ─── Admin Dashboard Theme Overrides ─── */
+.admin-theme {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+.admin-theme h1, .admin-theme h2, .admin-theme h3, .admin-theme h4, .admin-theme h5, .admin-theme h6, .admin-theme p, .admin-theme span, .admin-theme button, .admin-theme table, .admin-theme a, .admin-theme input, .admin-theme div {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+}
+
+.admin-theme code, .admin-theme pre {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace !important;
+}
+
+/* Custom dark scrollbar for admin dashboard */
+.admin-theme ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.admin-theme ::-webkit-scrollbar-track {
+  background: #0f172a;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb {
+  background: #334155;
+  border-radius: 4px;
+}
+
+.admin-theme ::-webkit-scrollbar-thumb:hover {
+  background: #475569;
+}
+
+/* Custom glow utility */
+.glow-card:hover {
+  box-shadow: 0 0 25px rgba(99,102,241,0.15);
+  border-color: rgba(99,102,241,0.4) !important;
+}
+

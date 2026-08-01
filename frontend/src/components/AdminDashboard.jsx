@@ -188,37 +188,44 @@ export default function AdminDashboard() {
   const { testsCount, publishedCount, vectorCount, storePath, tests } = data;
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col font-sans select-none">
+    <div className="admin-theme min-h-screen bg-[#070b13] text-slate-100 flex flex-col font-sans select-none relative overflow-x-hidden">
+      {/* Ambient background glows */}
+      <div className="absolute top-[-20%] left-[-10%] w-[600px] h-[600px] rounded-full bg-indigo-600/10 blur-[120px] pointer-events-none z-0" />
+      <div className="absolute bottom-[-10%] right-[-5%] w-[500px] h-[500px] rounded-full bg-purple-600/5 blur-[120px] pointer-events-none z-0" />
+
       {/* NAVBAR */}
-      <nav className="bg-slate-900 text-white h-[64px] px-8 flex justify-between items-center shadow-md select-none shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="bg-blue-600 w-9 h-9 rounded-md flex items-center justify-center font-black text-white text-lg">
-            A
+      <nav className="bg-slate-950/70 border-b border-slate-800/80 backdrop-blur-md text-white h-[64px] px-8 flex justify-between items-center shadow-lg shadow-slate-950/20 select-none shrink-0 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="bg-gradient-to-tr from-indigo-500 to-purple-600 w-9 h-9 rounded-lg flex items-center justify-center font-black text-white text-lg shadow-md shadow-indigo-500/20">
+            G
           </div>
-          <span className="font-extrabold text-sm uppercase tracking-wider text-gray-100">GATE MockAI — Control Center</span>
+          <div className="flex flex-col">
+            <span className="font-black text-sm uppercase tracking-wider text-white leading-tight">GATE MockAI</span>
+            <span className="text-[9px] text-indigo-400 font-extrabold uppercase tracking-widest leading-none">Administrative Portal</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-6">
           <Link 
             to="/admin/review-queue"
-            className="relative text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors flex items-center gap-2"
+            className="relative text-xs uppercase font-black text-slate-400 hover:text-white transition-colors flex items-center gap-2"
           >
             Review Queue
             {reviewCount > 0 && (
-              <span className="absolute -top-2 -right-3 bg-amber-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+              <span className="absolute -top-2 -right-3.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[9px] font-black rounded-full min-w-[16px] h-4 flex items-center justify-center px-1 shadow-md shadow-orange-500/20 animate-pulse">
                 {reviewCount}
               </span>
             )}
           </Link>
           <Link 
             to="/admin/analytics"
-            className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
+            className="text-xs uppercase font-black text-slate-400 hover:text-white transition-colors"
           >
             Analytics
           </Link>
           <a 
             href="/logout"
-            className="text-xs uppercase font-extrabold text-gray-400 hover:text-white transition-colors"
+            className="text-xs uppercase font-black text-rose-400 hover:text-rose-300 transition-colors"
           >
             Sign Out
           </a>
@@ -226,85 +233,91 @@ export default function AdminDashboard() {
       </nav>
 
       {/* DASHBOARD BODY */}
-      <main className="max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6 flex-1">
+      <main className="max-w-6xl w-full mx-auto px-6 py-8 flex flex-col gap-6 flex-1 relative z-10">
+        
         {/* API QUOTA BANNERS */}
         {quotaExceeded && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 text-red-800 shadow-sm animate-fade-in">
-            <XCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-600" />
+          <div className="bg-red-950/60 border border-red-800/80 rounded-xl p-4 flex items-start gap-3 text-red-200 shadow-xl shadow-red-950/30 backdrop-blur-md animate-fade-in">
+            <XCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
             <div>
               <p className="font-extrabold text-sm uppercase tracking-wide">🚫 Daily token limit reached</p>
-              <p className="text-xs text-red-700 mt-1">All AI operations (past paper ingestion and test generation) are paused until midnight IST.</p>
+              <p className="text-xs text-red-300 mt-1">All AI operations (past paper ingestion and test generation) are paused until midnight IST.</p>
             </div>
           </div>
         )}
         {!quotaExceeded && tokenUsage && tokenUsage.remainingTokens < 50000 && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 text-amber-800 shadow-sm animate-pulse">
-            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+          <div className="bg-amber-950/60 border border-amber-800/80 rounded-xl p-4 flex items-start gap-3 text-amber-200 shadow-xl shadow-amber-950/30 backdrop-blur-md animate-pulse">
+            <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-amber-500" />
             <div>
               <p className="font-extrabold text-sm uppercase tracking-wide">⚠ Gemini quota nearly exhausted</p>
-              <p className="text-xs text-amber-700 mt-1">Only {tokenUsage.remainingTokens.toLocaleString()} tokens left today. Ingestion and generation are paused until midnight.</p>
+              <p className="text-xs text-amber-300 mt-1">Only {tokenUsage.remainingTokens.toLocaleString()} tokens left today. Ingestion and generation are paused until midnight.</p>
             </div>
           </div>
         )}
 
         {/* TOP METRICS GRID */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div className="bg-blue-50 text-blue-600 p-3.5 rounded-full shrink-0">
+          
+          {/* Card 1: Total Papers */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 shadow-xl shadow-slate-950/10 flex items-center gap-4 glow-card transition-all duration-300">
+            <div className="bg-blue-500/10 border border-blue-500/20 text-blue-400 p-3 rounded-lg shrink-0">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">Total Papers</span>
-              <h3 className="text-xl font-black text-gray-800 mt-1">{testsCount}</h3>
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block leading-none">Total Papers</span>
+              <h3 className="text-2xl font-black text-white mt-1.5">{testsCount}</h3>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div className="bg-green-50 text-green-600 p-3.5 rounded-full shrink-0">
+          {/* Card 2: Published */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 shadow-xl shadow-slate-950/10 flex items-center gap-4 glow-card transition-all duration-300">
+            <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-3 rounded-lg shrink-0">
               <CheckSquare className="w-5 h-5" />
             </div>
             <div>
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">Published Papers</span>
-              <h3 className="text-xl font-black text-gray-800 mt-1">{publishedCount}</h3>
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block leading-none">Published Papers</span>
+              <h3 className="text-2xl font-black text-white mt-1.5">{publishedCount}</h3>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex items-center gap-4">
-            <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-full shrink-0">
+          {/* Card 3: Vectors */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 shadow-xl shadow-slate-950/10 flex items-center gap-4 glow-card transition-all duration-300">
+            <div className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 p-3 rounded-lg shrink-0">
               <Database className="w-5 h-5" />
             </div>
             <div className="min-w-0 flex-1">
-              <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">Vector Embeddings (PGVector)</span>
-              <h3 className="text-xl font-black text-gray-800 mt-1 truncate">{vectorCount} vectors</h3>
-              <p className="text-[9px] text-gray-400 mt-0.5 truncate font-mono">PostgreSQL · pgvector extension</p>
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block leading-none">Vector Embeddings</span>
+              <h3 className="text-2xl font-black text-white mt-1.5 truncate">{vectorCount}</h3>
+              <p className="text-[9px] text-slate-400 mt-0.5 truncate font-mono">PostgreSQL · pgvector</p>
             </div>
           </div>
 
-          <div className="bg-white border border-gray-200 rounded-lg p-5 shadow-sm flex flex-col justify-between min-h-[96px]">
+          {/* Card 4: Tokens */}
+          <div className="bg-slate-900/40 border border-slate-800 rounded-xl p-5 shadow-xl shadow-slate-950/10 flex flex-col justify-between min-h-[96px] glow-card transition-all duration-300">
             <div className="flex items-center gap-4">
-              <div className="bg-indigo-50 text-indigo-600 p-3.5 rounded-full shrink-0">
-                <Sparkles className="w-5 h-5" />
+              <div className="bg-purple-500/10 border border-purple-500/20 text-purple-400 p-3 rounded-lg shrink-0">
+                <Sparkles className="w-5 h-5 animate-pulse" />
               </div>
               <div className="flex-1 min-w-0">
-                <span className="text-[9px] text-gray-400 font-bold uppercase tracking-wider block leading-none">API TOKENS TODAY</span>
-                <h3 className="text-lg font-black text-gray-800 mt-1 truncate">
+                <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block leading-none">API TOKENS TODAY</span>
+                <h3 className="text-lg font-black text-white mt-1 truncate">
                   {tokenUsage ? `${(tokenUsage.totalTokens || 0).toLocaleString()} / ${(tokenUsage.limitTokens || 500000) / 1000}K` : '0 / 500K'}
                 </h3>
               </div>
             </div>
             {tokenUsage && (
               <div className="mt-2.5">
-                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-300 ${
                       (tokenUsage.totalTokens / tokenUsage.limitTokens) > 0.8 ? 'bg-red-500' :
-                      (tokenUsage.totalTokens / tokenUsage.limitTokens) > 0.5 ? 'bg-amber-500' : 'bg-green-500'
+                      (tokenUsage.totalTokens / tokenUsage.limitTokens) > 0.5 ? 'bg-amber-500' : 'bg-gradient-to-r from-emerald-500 to-indigo-500'
                     }`}
                     style={{ width: `${Math.min(100, ((tokenUsage.totalTokens || 0) / (tokenUsage.limitTokens || 500000)) * 100)}%` }}
                   />
                 </div>
-                <div className="flex justify-between items-center mt-1 text-[9px] text-gray-400 font-bold">
-                  <span>Est. cost: ${tokenUsage.estimatedCostUsd ? tokenUsage.estimatedCostUsd.toFixed(4) : '0.0000'}</span>
+                <div className="flex justify-between items-center mt-1 text-[9px] text-slate-400 font-bold font-mono">
+                  <span>Est: ${tokenUsage.estimatedCostUsd ? tokenUsage.estimatedCostUsd.toFixed(4) : '0.0000'}</span>
                   <span>{Math.round(((tokenUsage.totalTokens || 0) / (tokenUsage.limitTokens || 500000)) * 100)}%</span>
                 </div>
               </div>
@@ -314,64 +327,68 @@ export default function AdminDashboard() {
 
         {/* AI EXAM GENERATOR CONTROL DECKS */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 select-none">
-          {/* COMPILER TRIGGER CARDS */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col justify-between gap-4">
+          
+          {/* Card 1: Compiler */}
+          <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6 shadow-xl shadow-slate-950/20 flex flex-col justify-between gap-5 relative overflow-hidden group hover:border-indigo-500/40 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-indigo-500/10 transition-all duration-300" />
             <div>
-              <div className="flex items-center gap-2 text-indigo-700">
+              <div className="flex items-center gap-2.5 text-indigo-400">
                 <Sparkles className="w-5 h-5 animate-pulse" />
                 <h3 className="text-sm font-black uppercase tracking-wider">AI RAG Exam Compiler</h3>
               </div>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
                 Compile a full-length, high-fidelity 65-question GATE paper matching official CSE weightage allocations. Dynamically retrieves questions from PGVector semantic stores and reranks using Gemini AI.
               </p>
             </div>
 
             <Link
               to="/admin/generate/progress"
-              className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 px-4 rounded-[4px] shadow flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider"
+              className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-bold py-2.5 px-4 rounded-lg shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 uppercase text-xs tracking-wider"
             >
               <span>Compile Full Paper</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
 
-          {/* WEIGHTED GENERATOR TRIGGER CARDS */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col justify-between gap-4">
+          {/* Card 2: Weighted syllabuses */}
+          <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6 shadow-xl shadow-slate-950/20 flex flex-col justify-between gap-5 relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300">
+            <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/5 rounded-full blur-2xl pointer-events-none group-hover:bg-blue-500/10 transition-all duration-300" />
             <div>
-              <div className="flex items-center gap-2 text-blue-700">
+              <div className="flex items-center gap-2.5 text-blue-400">
                 <Sparkles className="w-5 h-5" />
                 <h3 className="text-sm font-black uppercase tracking-wider">Dynamic Weighted syllabus Compiler</h3>
               </div>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+              <p className="text-xs text-slate-400 mt-2.5 leading-relaxed">
                 Manually distribute marks across standard computer science syllabus subjects (e.g. Operating Systems, SQL databases) to generate custom AI papers tailored to specialized study benchmarks.
               </p>
             </div>
 
             <Link
               to="/admin/weighted-generator"
-              className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-[4px] shadow flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white font-bold py-2.5 px-4 rounded-lg shadow-md shadow-blue-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 uppercase text-xs tracking-wider"
             >
               <span>Custom Weightage Builder</span>
-              <ArrowRight className="w-4 h-4" />
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
             </Link>
           </div>
         </div>
 
         {/* BOTTOM DOUBLE GRID: RAG RE-INGEST SEEDING vs MOCK EXAMS LISTS */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 flex-1 items-start">
+          
           {/* SEED RE-INGEST DRAWER */}
-          <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm flex flex-col gap-4 self-start">
-            <div className="flex items-center gap-2 text-slate-800">
-              <Database className="w-5 h-5 text-indigo-600" />
+          <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-6 shadow-xl shadow-slate-950/15 flex flex-col gap-4 self-start">
+            <div className="flex items-center gap-2 text-slate-100">
+              <Database className="w-5 h-5 text-indigo-400" />
               <h3 className="text-xs font-black uppercase tracking-wider">PGVector RAG & Seeding</h3>
             </div>
 
-            <p className="text-xs text-gray-500 leading-relaxed">
+            <p className="text-xs text-slate-400 leading-relaxed">
               If the database seed questions are updated or PGVector is cleared, use this command to re-chunk and write high-dimension embeddings back to the Postgres Vector store.
             </p>
 
             {syncMsg && (
-              <div className="bg-green-50 border border-green-200 rounded-md p-3 text-xs text-green-700 font-semibold leading-relaxed">
+              <div className="bg-emerald-950/50 border border-emerald-800/80 rounded-lg p-3 text-xs text-emerald-300 font-semibold leading-relaxed">
                 {syncMsg}
               </div>
             )}
@@ -380,7 +397,7 @@ export default function AdminDashboard() {
               type="button"
               disabled={reingesting}
               onClick={handleReingest}
-              className="w-full bg-slate-800 hover:bg-slate-900 active:bg-slate-950 disabled:bg-slate-400 text-white font-extrabold py-2.5 px-4 rounded-[4px] shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider"
+              className="w-full bg-slate-800 hover:bg-slate-700 active:bg-slate-900 disabled:bg-slate-900 disabled:text-slate-500 text-white font-black py-2.5 px-4 rounded-lg shadow flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 uppercase text-xs tracking-wider"
             >
               {reingesting ? (
                 <>
@@ -395,26 +412,26 @@ export default function AdminDashboard() {
               )}
             </button>
 
-            <div className="border-t border-gray-100 pt-4 flex flex-col gap-2">
-              <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider block">Ingestion Engine</span>
-              <p className="text-[11px] text-gray-500 leading-relaxed">
+            <div className="border-t border-slate-800/80 pt-4 flex flex-col gap-2.5">
+              <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-wider block">Ingestion Engine</span>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
                 Upload official GATE exam papers. Gemini AI extracts, solves, and enriches all questions in one pass — no answer keys required.
               </p>
-              <div className="flex flex-col sm:flex-row items-center gap-2 mt-1">
+              <div className="flex flex-col gap-2 mt-1">
                 <Link
                   to="/admin/rag"
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-extrabold py-2.5 px-4 rounded-[4px] shadow-sm flex items-center justify-center gap-2 cursor-pointer transition-all duration-150 uppercase text-xs tracking-wider w-full text-center"
+                  className="bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 text-white font-black py-2.5 px-4 rounded-lg shadow-md shadow-indigo-950/50 flex items-center justify-center gap-2 cursor-pointer transition-all duration-200 uppercase text-xs tracking-wider text-center"
                 >
                   <PlusCircle className="w-4 h-4" />
                   <span>Ingest Past Papers (RAG)</span>
                 </Link>
                 {geminiStatus && (
-                  <span className={`shrink-0 px-2 py-2 rounded-[4px] text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1.5 border w-full sm:w-auto justify-center ${
+                  <span className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center gap-1.5 border justify-center ${
                     geminiStatus.connected
-                      ? 'bg-green-50 text-green-700 border-green-200'
-                      : 'bg-red-50 text-red-700 border-red-200'
+                      ? 'bg-emerald-950/40 text-emerald-400 border-emerald-800/50'
+                      : 'bg-red-950/40 text-red-400 border-red-800/50'
                   }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${geminiStatus.connected ? 'bg-green-500' : 'bg-red-500'}`} />
+                    <span className={`w-1.5 h-1.5 rounded-full ${geminiStatus.connected ? 'bg-emerald-500' : 'bg-red-500'}`} />
                     {geminiStatus.connected ? 'Gemini 3.5 Flash Connected' : 'API Key Not Set'}
                   </span>
                 )}
@@ -423,90 +440,98 @@ export default function AdminDashboard() {
           </div>
 
           {/* MOCK EXAMS LISTINGS */}
-          <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex flex-col flex-1">
-            <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex items-center gap-2 select-none">
-              <FileText className="w-5 h-5 text-gray-600" />
-              <h3 className="text-xs font-black text-gray-700 uppercase tracking-wider">Relational mock Exam database</h3>
+          <div className="lg:col-span-2 bg-slate-900/30 border border-slate-800 rounded-xl shadow-xl shadow-slate-950/15 overflow-hidden flex flex-col">
+            <div className="bg-slate-950/40 border-b border-slate-800/80 px-6 py-4 flex items-center gap-2.5 select-none">
+              <FileText className="w-5 h-5 text-slate-400" />
+              <h3 className="text-xs font-black text-slate-300 uppercase tracking-wider">Relational mock Exam database</h3>
             </div>
 
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto">
               <table className="w-full text-left text-sm border-collapse">
                 <thead>
-                  <tr className="bg-gray-100 text-gray-500 uppercase text-[9px] tracking-wider border-b border-gray-200 font-bold">
-                    <th className="px-6 py-3">Title Description</th>
-                    <th className="px-6 py-3">Specs</th>
-                    <th className="px-6 py-3 text-center">Questions</th>
-                    <th className="px-6 py-3 text-center">Status</th>
-                    <th className="px-6 py-3 text-right">Actions</th>
+                  <tr className="bg-slate-950/20 text-slate-400 uppercase text-[9px] tracking-wider border-b border-slate-800 font-extrabold">
+                    <th className="px-6 py-4">Title Description</th>
+                    <th className="px-6 py-4">Specs</th>
+                    <th className="px-6 py-4 text-center">Questions</th>
+                    <th className="px-6 py-4 text-center">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 font-sans text-gray-700 font-medium">
-                  {tests.map((test) => (
-                    <tr key={test.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <p className="font-extrabold text-gray-800 text-sm leading-tight">{test.title}</p>
-                        <p className="text-[9px] text-gray-400 mt-1 font-mono">{test.id.slice(0, 8).toUpperCase()}</p>
-                      </td>
-                      <td className="px-6 py-4 text-xs text-gray-500 leading-normal">
-                        <p>{test.topic || 'All Topics'}</p>
-                        <p className="text-[10px] text-gray-400 font-semibold">{test.subject || 'Core syllabus'}</p>
-                      </td>
-                      <td className="px-6 py-4 text-center font-bold text-gray-800 text-xs">
-                        {test.totalQuestions}
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase leading-5 tracking-wide ${
-                          (test.isPublished || test.published) 
-                            ? 'bg-green-50 text-green-700 border border-green-200' 
-                            : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
-                        }`}>
-                          {(test.isPublished || test.published) ? 'Published' : 'Draft'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button
-                            type="button"
-                            disabled={publishingId === test.id || (test.isPublished || test.published)}
-                            onClick={() => handlePublishTest(test.id)}
-                            className={`p-1.5 rounded transition-all duration-150 border ${
-                              (test.isPublished || test.published)
-                                ? 'text-gray-400 bg-gray-50 border-gray-200 cursor-not-allowed'
-                                : 'text-green-600 bg-green-50 hover:bg-green-100 border-green-200'
-                            }`}
-                            title={(test.isPublished || test.published) ? 'Paper Published' : 'Publish / Go Live'}
-                          >
-                            {publishingId === test.id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (test.isPublished || test.published) ? (
-                              <Check className="w-4 h-4" />
-                            ) : (
-                              <CheckCircle className="w-4 h-4" />
-                            )}
-                          </button>
-
-                          {/* Edit Button */}
-                          <Link
-                            to={`/admin/tests/${test.id}/edit`}
-                            className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded transition-all duration-150"
-                            title="Edit Paper"
-                          >
-                            <Pencil className="w-4 h-4" />
-                          </Link>
-
-                          {/* Delete Button */}
-                          <button
-                            type="button"
-                            onClick={() => setDeleteConfirmTest(test)}
-                            className="p-1.5 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded transition-all duration-150"
-                            title="Delete Paper"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
+                <tbody className="divide-y divide-slate-800/80 text-slate-300 font-medium">
+                  {tests.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-slate-500 text-xs font-medium">
+                        No papers found in the database. Ingest one to get started!
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    tests.map((test) => (
+                      <tr key={test.id} className="hover:bg-slate-900/20 transition-colors">
+                        <td className="px-6 py-4">
+                          <p className="font-extrabold text-white text-sm leading-tight">{test.title}</p>
+                          <p className="text-[9px] text-slate-500 mt-1 font-mono">{test.id.slice(0, 8).toUpperCase()}</p>
+                        </td>
+                        <td className="px-6 py-4 text-xs text-slate-400 leading-normal">
+                          <p className="font-semibold">{test.topic || 'All Topics'}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">{test.subject || 'Core syllabus'}</p>
+                        </td>
+                        <td className="px-6 py-4 text-center font-black text-white text-xs">
+                          {test.totalQuestions}
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`inline-flex px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wide leading-none ${
+                            (test.isPublished || test.published) 
+                              ? 'bg-emerald-950/50 text-emerald-400 border border-emerald-800/50' 
+                              : 'bg-amber-950/50 text-amber-400 border border-amber-800/50'
+                          }`}>
+                            {(test.isPublished || test.published) ? 'Published' : 'Draft'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              disabled={publishingId === test.id || (test.isPublished || test.published)}
+                              onClick={() => handlePublishTest(test.id)}
+                              className={`p-1.5 rounded-lg transition-all duration-200 border ${
+                                (test.isPublished || test.published)
+                                  ? 'text-slate-600 bg-slate-900/30 border-slate-800/50 cursor-not-allowed'
+                                  : 'text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border-emerald-500/20'
+                              }`}
+                              title={(test.isPublished || test.published) ? 'Paper Published' : 'Publish / Go Live'}
+                            >
+                              {publishingId === test.id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (test.isPublished || test.published) ? (
+                                <Check className="w-4 h-4" />
+                              ) : (
+                                <CheckCircle className="w-4 h-4" />
+                              )}
+                            </button>
+
+                            {/* Edit Button */}
+                            <Link
+                              to={`/admin/tests/${test.id}/edit`}
+                              className="p-1.5 text-indigo-400 bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/20 rounded-lg transition-all duration-200"
+                              title="Edit Paper"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Link>
+
+                            {/* Delete Button */}
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmTest(test)}
+                              className="p-1.5 text-red-400 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 rounded-lg transition-all duration-200"
+                              title="Delete Paper"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>
@@ -516,20 +541,20 @@ export default function AdminDashboard() {
 
       {/* CUSTOM DELETE CONFIRMATION MODAL */}
       {deleteConfirmTest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-          <div className="bg-white border border-slate-200 rounded-xl max-w-md w-full shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100">
-            <div className="flex items-center gap-3 text-red-600">
-              <div className="bg-red-50 p-2 rounded-full">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full shadow-2xl p-6 flex flex-col gap-4 transform transition-all scale-100">
+            <div className="flex items-center gap-3 text-red-400">
+              <div className="bg-red-500/10 border border-red-500/20 p-2 rounded-lg">
                 <AlertTriangle className="w-6 h-6" />
               </div>
-              <h3 className="font-extrabold text-base uppercase tracking-wider text-slate-800">
+              <h3 className="font-black text-base uppercase tracking-wider text-white">
                 Delete Mock Paper?
               </h3>
             </div>
             
-            <div className="text-sm text-slate-500 leading-relaxed">
-              Are you sure you want to permanently delete <strong className="text-slate-800 font-bold">"{deleteConfirmTest.title}"</strong>?
-              <p className="mt-2 text-xs text-red-500 font-medium">
+            <div className="text-sm text-slate-400 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-white font-bold">"{deleteConfirmTest.title}"</strong>?
+              <p className="mt-2 text-xs text-red-400 font-medium bg-red-950/20 border border-red-950 p-2.5 rounded-lg">
                 This action is irreversible. All student progress, grades, and associated exam attempts will be deleted.
               </p>
             </div>
@@ -539,7 +564,7 @@ export default function AdminDashboard() {
                 type="button"
                 disabled={deletingId === deleteConfirmTest.id}
                 onClick={() => setDeleteConfirmTest(null)}
-                className="px-4 py-2 text-xs font-extrabold uppercase tracking-wide rounded-md text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors cursor-pointer"
+                className="px-4 py-2 text-xs font-black uppercase tracking-wide rounded-md text-slate-400 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -547,7 +572,7 @@ export default function AdminDashboard() {
                 type="button"
                 disabled={deletingId === deleteConfirmTest.id}
                 onClick={() => handleDeleteTest(deleteConfirmTest.id)}
-                className="px-4 py-2 text-xs font-extrabold uppercase tracking-wide rounded-md text-white bg-red-600 hover:bg-red-700 active:bg-red-800 transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                className="px-4 py-2 text-xs font-black uppercase tracking-wide rounded-md text-white bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 transition-all duration-200 flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-red-950/50"
               >
                 {deletingId === deleteConfirmTest.id ? (
                   <>
@@ -569,10 +594,11 @@ export default function AdminDashboard() {
       {/* Toast Notification */}
       {toast && (
         <div className="fixed bottom-5 right-5 bg-slate-950 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2.5 z-50 animate-fade-in border border-slate-800 font-sans">
-          <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+          <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
           <span className="text-xs font-bold">{toast}</span>
         </div>
       )}
     </div>
   )
 }
+

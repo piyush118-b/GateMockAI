@@ -314,6 +314,7 @@ public class MultimodalIngestionService {
             if (cleaned.startsWith("```")) {
                 cleaned = cleaned.replaceAll("^```[a-z]*\\n?", "").replaceAll("```$", "").trim();
             }
+            cleaned = sanitizeJsonForJackson(cleaned);
 
             JsonNode root = objectMapper.readTree(cleaned);
             JsonNode questionsNode = root.path("questions");
@@ -441,5 +442,56 @@ public class MultimodalIngestionService {
 
         log.debug("[Ingestion] Saved Q{} ({}): confidence={}",
                 result.getQuestionNumber(), result.getQuestionType(), result.getConfidenceScore());
+    }
+
+    private String sanitizeJsonForJackson(String json) {
+        if (json == null) return null;
+        StringBuilder sb = new StringBuilder();
+        boolean inString = false;
+        for (int i = 0; i < json.length(); i++) {
+            char c = json.charAt(i);
+            if (c == '"') {
+                if (i > 0 && json.charAt(i - 1) == '\\') {
+                    int backslashes = 0;
+                    for (int j = i - 1; j >= 0; j--) {
+                        if (json.charAt(j) == '\\') backslashes++;
+                        else break;
+                    }
+                    if (backslashes % 2 == 0) {
+                        inString = !inString;
+                    }
+                } else {
+                    inString = !inString;
+                }
+                sb.append(c);
+            } else if (c == '\\' && inString) {
+                if (i + 1 < json.length()) {
+                    char next = json.charAt(i + 1);
+                    if (next == '"' || next == '\\' || next == '/' || next == 'b' || next == 'f' || next == 'n' || next == 'r' || next == 't') {
+                        sb.append(c);
+                    } else if (next == 'u' && i + 5 < json.length() && isHex(json.substring(i + 2, i + 6))) {
+                        sb.append(c);
+                    } else {
+                        // Double-escape invalid JSON escapes like \sum, \frac, \{
+                        sb.append("\\\\");
+                    }
+                } else {
+                    sb.append("\\\\");
+                }
+            } else {
+                sb.append(c);
+            }
+        }
+        return sb.toString();
+    }
+
+    private boolean isHex(String s) {
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (!((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F'))) {
+                return false;
+            }
+        }
+        return true;
     }
 }
