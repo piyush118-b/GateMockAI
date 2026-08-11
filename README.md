@@ -5,7 +5,7 @@
 
 ---
 
-## 🚀 What's New in v2.1
+## 🚀 What's New 
 
 | | v1 (Ollama + OCR) | **v2.1 (Gemini Multimodal)** |
 |---|---|---|
