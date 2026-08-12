@@ -1,7 +1,8 @@
 # GateMockAI
 ### AI-Powered GATE Exam Platform — v2.1 (Gemini Multimodal)
 
-> **Team CodeDrip** · Piyush · Production-grade GATE exam ingestion, enrichment & mock exam simulator
+> **Team CodeDrip** 
+· Piyush · Production-grade GATE exam ingestion, enrichment & mock exam simulator
 
 ---
 
