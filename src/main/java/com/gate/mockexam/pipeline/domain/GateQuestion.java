@@ -79,6 +79,10 @@ public class GateQuestion {
     @Builder.Default
     private String reviewStatus = "PUBLISHED";
 
+    /** Image asset associated with this question (MinIO object key) */
+    @Column(name = "image_path", length = 500)
+    private String imagePath;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

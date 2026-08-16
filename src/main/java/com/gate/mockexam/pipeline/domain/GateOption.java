@@ -34,4 +34,8 @@ public class GateOption {
 
     @Column(name = "display_order", nullable = false)
     private Integer displayOrder;
+
+    /** Image asset associated with this option (MinIO object key) */
+    @Column(name = "image_path", length = 500)
+    private String imagePath;
 }
