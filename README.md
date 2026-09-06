@@ -6,8 +6,7 @@
 
 ---
 
-## 🚀 What's New **v2.1
-
+## 🚀 What's New 
 | | v1 (Ollama + OCR) | **v2.1 (Gemini Multimodal)** |
 |---|---|---|
 | PDF reading | Python OCR (PaddleOCR / PyMuPDF) | **Gemini reads PDF natively** |
